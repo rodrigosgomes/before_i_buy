@@ -27,11 +27,20 @@ Este repositório contém o código-fonte do **Before I Buy**, um jogo social pr
 
 ---
 
-## 3. Playbook de Engenharia para IAs
+## 3. Processo de Qualidade Obrigatório
+
+Antes de escrever código, todo agente deve vincular a mudança a uma task e registrar plano técnico, estratégia de testes e foco da revisão adversarial. O fluxo obrigatório é:
+
+`task → plano técnico → testes planejados → implementação → revisão adversarial → CI verde → merge`
+
+Use o [processo de qualidade](../docs/06-delivery/quality-process.md), a [Definition of Done](../docs/06-delivery/definition-of-done.md) e os templates de task/PR. Cobertura mínima é 80% por superfície alterada; RLS exige testes negativos por papel e E2E cobre o handoff crítico afetado. Nenhum agente deve enfraquecer ou ignorar um gate para obter CI verde.
+
+---
+
+## 4. Playbook de Engenharia para IAs
 
 Todas as IAs que operam neste repositório devem ler e seguir as diretrizes consolidadas no [AI_PLAYBOOK.md](file:///home/rodrigo/before_i_buy/docs/AI_PLAYBOOK.md), incluindo:
 - Quality Gate inegociável de $\ge 80\%$ de cobertura de testes automatizados.
 - Padrão *Vertical Slice Architecture* e *Schema-First*.
 - RLS *Deny-by-Default* com testes negativos de segurança.
 - Ciclo de vida estrito da máquina de estados do *Closed Loop*.
-

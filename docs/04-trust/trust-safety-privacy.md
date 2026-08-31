@@ -49,7 +49,7 @@ Relevant current references:
 ### Defaults
 
 - Every dilemma is private/unlisted.
-- Invite page uses a generic social preview by default.
+- Invite page uses a generic social preview in every sharing path.
 - Search indexing is disabled.
 - Live results are hidden until the recipient votes.
 - Owner decides whether reflection/note appears in Reveal.
@@ -180,7 +180,7 @@ Use the OWASP Mobile Application Security Verification Standard as an implementa
 5. Deleting a dilemma removes media access and participant views.
 6. Account deletion cascades or queues every owned object and records progress.
 7. Blocked user cannot submit new content to the blocker.
-8. Generic preview remains generic until owner explicitly changes it.
+8. Generic preview remains generic in every sharing path; the owner has no item-specific preview override.
 9. Large screenshots with embedded metadata are re-encoded and stripped where feasible.
 10. Operator access is least-privilege and auditable.
 11. Owner self-prediction is absent from participant APIs, Reveal payloads, and analytics exports.

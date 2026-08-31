@@ -142,7 +142,7 @@ Requirements:
 - After voting, the web flow may collect a separate one-dilemma Reveal subscription; failure or refusal must not affect the vote.
 - Preserve the invite token only through the minimum handoff path.
 - Set `Referrer-Policy: no-referrer`, `Cache-Control` appropriate for private content, and `X-Robots-Tag: noindex, nofollow`.
-- Generic Open Graph content is default; explicit owner opt-in is required for item preview.
+- Open Graph content is always generic; item-specific previews are not supported.
 
 ## 10. Media handling
 

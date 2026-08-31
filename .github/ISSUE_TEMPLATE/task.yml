@@ -1,0 +1,60 @@
+name: Task de produto e engenharia
+description: Planeje uma mudança pequena, testável e vinculada ao MVP.
+title: "task: "
+labels:
+  - task
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Uma task não começa em código. Preencha o plano, critérios de aceite e estratégia de teste antes de solicitar implementação.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Resultado e contexto de produto
+      description: Qual comportamento observável muda? Vincule ao PRD, jornada ou decisão aplicável.
+      placeholder: "Como ..., quero ..., para ..."
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Escopo e não-escopo
+      description: Delimite a vertical slice e o que fica explicitamente de fora.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Critérios de aceite
+      description: Liste resultados verificáveis, incluindo estados vazios, erro e acessibilidade quando aplicável.
+    validations:
+      required: true
+  - type: textarea
+    id: technical-plan
+    attributes:
+      label: Plano técnico obrigatório antes do código
+      description: Inclua contratos/schema, arquivos ou módulos, estados, autorização, risco, rollback e impacto em analytics.
+    validations:
+      required: true
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: Estratégia de testes
+      description: Informe testes unitários, integração, RLS negativo, offline e E2E críticos ou justifique cada item não aplicável.
+    validations:
+      required: true
+  - type: textarea
+    id: privacy-security
+    attributes:
+      label: Privacidade e segurança
+      description: Dados tratados, autorização, RLS, tokens, retenção, logs e analytics permitidos.
+    validations:
+      required: true
+  - type: textarea
+    id: review-focus
+    attributes:
+      label: Foco da revisão adversarial
+      description: Qual hipótese, abuso, regressão ou acesso indevido outro revisor deve tentar quebrar?
+    validations:
+      required: true

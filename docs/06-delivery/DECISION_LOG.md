@@ -111,3 +111,13 @@ Cada entrada segue o padrão:
   3. *Memória de Sessão:* `ctx_memory` (Context-Mode) e Knowledge Items locais.
 - **Consequências:** Continuidade perfeita do trabalho entre diferentes agentes ou reinicializações de sessão.
 - **Gatilho de Revisão:** Mudança de ferramentas de contexto da IDE.
+
+---
+
+### DEC-009: Primeira Entrega Técnica Focada em Criação Privada, Convite e Voto
+- **Data:** 2026-08-30
+- **Status:** `Aceito`
+- **Contexto:** O MVP completo depende do loop fechado, mas iniciar simultaneamente por decisão, reflexão, Reveal, mídia, notificações e moderação aumentaria o risco e retardaria a primeira evidência de criação e participação.
+- **Decisão:** A primeira entrega técnica cobre rascunho local explícito, publicação privada, convite revogável e voto anônimo de convidado. Ela preserva os contratos de estado para `decision_due`, mas não implementa decisão, reflexão, Reveal, pontuação, IA, imagens, URLs, razões de voto ou coleta de contato do convidado.
+- **Consequências:** A equipe consegue testar as duas primeiras transições com privacidade e autorização completas. As entregas seguintes devem adicionar o restante do loop sem reinterpretar votos já persistidos.
+- **Gatilho de Revisão:** A entrega só é ampliada antes da conclusão se os testes mostrarem que ausência de mídia, URL ou razão de voto impede materialmente a compreensão ou conversão.

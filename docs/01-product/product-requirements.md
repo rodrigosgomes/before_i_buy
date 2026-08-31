@@ -6,7 +6,7 @@ Before I Buy helps people pause on discretionary purchases, ask people they trus
 
 The concept should not be positioned as budgeting, expense tracking, financial advice, or anti-shopping. Existing products already cover cooling periods, private decision checklists, public purchase voting, and AI purchase advice. The unvalidated opportunity is the combination of friend predictions, delayed outcomes, prediction reputation, and longitudinal personal satisfaction.
 
-**Recommendation:** proceed with a narrow private-group validation, then build only if users reliably complete both the decision and later-reflection stages.
+**Recommendation:** implement the narrow first technical slice and collect evidence in a controlled private-group beta. Expand beyond the closed loop only if users reliably complete both the decision and later-reflection stages.
 
 ## 2. Vision and promise
 
@@ -307,7 +307,7 @@ See the metrics document for definitions and guardrails.
 
 ## 16. Final recommendation
 
-**Proceed with changes.** Run a manual WhatsApp-based concierge test before building the full mobile app. If real friend groups do not complete delayed reflection and open Reveals, the central differentiation fails even if voting is popular.
+**Proceed with changes.** Per DEC-004, begin with the narrow technical slice and measure the delayed-reflection and Reveal hypotheses in a controlled closed beta. If real friend groups do not complete delayed reflection and open Reveals, the central differentiation fails even if voting is popular.
 
 ### Recommended MVP
 
@@ -327,6 +327,6 @@ Private, link-shared dilemmas; guest voting; configurable short pause; decision 
 
 ### First three experiments
 
-1. Two-week WhatsApp concierge test with five friend groups.
-2. Clickable create/vote/Reveal prototype with invited recipients.
-3. Notification and delayed-Recall test using manually scheduled Reveals.
+1. Closed-beta test of the first technical slice with five friend groups.
+2. Usability test of create, vote, and Reveal screens with invited recipients before each later slice.
+3. Notification and delayed-recall test using the durable scheduling path before the reflection release.

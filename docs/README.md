@@ -18,6 +18,7 @@ The private, invite-link MVP should test this loop with real friend groups. A pu
 |---|---|---|
 | Product | [Product requirements](01-product/product-requirements.md) | Vision, users, hypotheses, product decisions, prioritization, monetization, recommendation |
 | Product | [MVP specification](01-product/mvp-specification.md) | Buildable scope, requirements, acceptance criteria, non-goals, release gates |
+| Product | [First delivery mini-PRD](01-product/first-delivery-mini-prd.md) | Canonical scope for the first technical delivery: private creation, invite, and guest vote |
 | Experience | [Journeys, stories, and screens](02-experience/journeys-stories-screens.md) | End-to-end flows, user stories, screen states, notifications, edge cases |
 | Experience | [Experience principles](02-experience/experience-principles.md) | Voice, accessibility, gamification, insight design, content rules |
 | Strategy | [Competitive analysis](03-strategy/competitive-analysis.md) | Current products, observed overlap, inferences, differentiation requirements |
@@ -27,6 +28,9 @@ The private, invite-link MVP should test this loop with real friend groups. A pu
 | Technical | [Technical architecture](05-technical/technical-architecture.md) | Recommended stack, system boundaries, security, jobs, deep links, operations |
 | Technical | [Conceptual data model](05-technical/conceptual-data-model.md) | Entities, relationships, lifecycles, visibility and deletion rules |
 | Delivery | [Roadmap, risks, and decisions](06-delivery/roadmap-risks-decisions.md) | Phases, ranked risks, dependencies, decision log, open questions |
+| Delivery | [Quality process and merge](06-delivery/quality-process.md) | Mandatory task/PR process, test strategy, CI gates, adversarial review, and branch protection |
+| Delivery | [Definition of Done](06-delivery/definition-of-done.md) | Shared merge contract for scope, tests, coverage, security, and review |
+| Delivery | [Supabase CLI local](06-delivery/supabase-cli-setup.md) | Reproducible local database commands and remote-operation safety boundaries |
 | Marketing | [Marketing and monetization](07-marketing/README.md) | Recommended revenue sequence, social-platform patterns, emotional game mechanics, pricing, and experiments |
 | Marketing | [Monetization strategy](07-marketing/monetization-strategy.md) | Subscription, Circle Pass, cosmetics, creator economy, commercial models, and guardrails |
 | Marketing | [Game mechanics and emotional value](07-marketing/game-mechanics-and-emotional-value.md) | Ethical use of vanity, satisfaction, influence, belonging, curiosity, reciprocity, and mastery |
@@ -69,3 +73,14 @@ When a product decision changes:
 2. update the affected requirement and acceptance criteria;
 3. update the data model and analytics event if behavior changes;
 4. record the evidence or experiment that caused the change.
+
+## Source-of-truth order
+
+When product documents conflict, resolve the conflict before implementation. The order of precedence is:
+
+1. accepted entries in the [Decision Log](06-delivery/DECISION_LOG.md);
+2. the [MVP specification](01-product/mvp-specification.md);
+3. the active delivery mini-PRD for the implementation slice;
+4. supporting product, experience, trust, technical, and strategy documents.
+
+The active mini-PRD may narrow a release slice but cannot override an accepted product, security, or privacy decision.

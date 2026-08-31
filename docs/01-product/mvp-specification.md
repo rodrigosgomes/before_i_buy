@@ -98,7 +98,7 @@ Acceptance criteria:
 - Owner can share through the native share sheet.
 - Link opens a mobile web page when the app is absent and the app detail when installed.
 - Owner can revoke and regenerate access.
-- Link previews disclose item name/image only if owner explicitly enables previews; default preview is generic.
+- Link previews are always generic and never disclose item name, price, image, creator, or other dilemma content.
 
 Acceptance criteria:
 

@@ -2,13 +2,13 @@
 
 ## 1. Delivery recommendation
 
-Do not start with a full app build. Run the manual and prototype validations, then build a closed beta only if delayed completion signals are credible.
+Per DEC-004, the project starts directly with code rather than making concierge validation a prerequisite. Product evidence is therefore collected during the controlled closed beta, and the MVP release gates remain mandatory before expansion.
 
 ## 2. Roadmap
 
-### Phase 0 — Evidence before code
+### Phase 0 — Archived evidence plan (not a prerequisite)
 
-Duration hypothesis: 3–5 weeks.
+This phase is not required before implementation under DEC-004. Its templates, interview scripts, and thresholds remain useful for the closed beta and go/iterate/stop reviews.
 
 Deliverables:
 
@@ -23,7 +23,7 @@ Deliverables:
 - vote-mechanic comparison;
 - go/iterate/stop review.
 
-Exit criteria:
+Original evidence criteria, now applied as closed-beta review inputs:
 
 - at least four of six behavioral thresholds pass;
 - reflection and Reveal-open thresholds must pass or be close enough for one clearly defined iteration;

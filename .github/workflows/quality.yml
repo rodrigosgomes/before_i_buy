@@ -1,0 +1,115 @@
+name: Quality gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-contract:
+    name: Repository contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject whitespace errors
+        run: git diff --check
+      - name: Verify required quality contracts
+        run: |
+          test -f docs/06-delivery/quality-process.md
+          test -f docs/06-delivery/definition-of-done.md
+          test -f .github/pull_request_template.md
+          test -f .github/ISSUE_TEMPLATE/task.yml
+
+  database-policy-tests:
+    name: Database policy tests
+    needs: repository-contract
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.114.0
+      - name: Start isolated Supabase stack
+        run: supabase start
+      - name: Run migrations and pgTAP policy tests
+        run: supabase test db
+      - name: Stop isolated Supabase stack
+        if: always()
+        run: supabase stop --no-backup
+
+  mobile-quality:
+    name: Mobile lint, tests, and coverage
+    needs: repository-contract
+    if: ${{ hashFiles('apps/mobile/pubspec.yaml') != '' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: flutter analyze
+      - run: flutter test --coverage
+      - name: Enforce 80 percent line coverage
+        run: bash ../../scripts/ci/assert-lcov-coverage.sh coverage/lcov.info 80
+
+  guest-web-quality:
+    name: Guest web lint, tests, and coverage
+    needs: repository-contract
+    if: ${{ hashFiles('apps/guest-web/package-lock.json') != '' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/guest-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/guest-web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:coverage
+      - name: Enforce 80 percent line coverage
+        run: bash ../../scripts/ci/assert-lcov-coverage.sh coverage/lcov.info 80
+
+  guest-web-critical-e2e:
+    name: Guest web critical E2E
+    needs:
+      - database-policy-tests
+      - guest-web-quality
+    if: ${{ hashFiles('apps/guest-web/package-lock.json') != '' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/guest-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/guest-web/package-lock.json
+      - run: npm ci
+      - name: Require the critical-flow script
+        run: node -e "const {scripts = {}} = require('./package.json'); if (!scripts['e2e:critical']) process.exit(1)"
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e:critical

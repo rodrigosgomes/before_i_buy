@@ -78,7 +78,7 @@ Fields:
 - visibility `unlisted`;
 - state;
 - published/decision/reflection/closed/deleted timestamps;
-- generic-versus-item link-preview choice;
+- generic link-preview contract version; item-specific previews are not supported;
 - version for optimistic concurrency.
 
 States:
@@ -115,7 +115,7 @@ Fields:
 - token hash, never plaintext;
 - status;
 - created/expires/revoked timestamps;
-- generic/item-preview flag;
+- generic link-preview contract version;
 - rate-limit counters or references;
 - optional campaign/source code that contains no personal data.
 

@@ -1,0 +1,12 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Supabase local state and generated runtime files
+backend/.supabase/
+backend/supabase/.temp/
+backend/supabase/.branches/
+
+# Node tooling for the backend
+backend/node_modules/

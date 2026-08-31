@@ -1,0 +1,18 @@
+{
+  "name": "before-i-buy-backend-tooling",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "supabase": "2.114.0"
+  },
+  "scripts": {
+    "db:start": "supabase start",
+    "db:status": "supabase status",
+    "db:test": "supabase test db",
+    "db:reset": "supabase db reset",
+    "db:stop": "supabase stop --no-backup"
+  }
+}
