@@ -14,6 +14,9 @@
     "db:migrate": "supabase migration up --local",
     "db:test": "supabase test db",
     "db:reset": "supabase db reset",
-    "db:stop": "supabase stop --no-backup"
+    "db:stop": "supabase stop --no-backup",
+    "test:edge-contract": "node --experimental-test-coverage --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 --test-coverage-include=\"supabase/functions/guest-invite/handler.mjs\" --test tests/guest-invite-handler.test.mjs",
+    "test:db-concurrency": "node --test tests/guest-session-concurrency.test.mjs",
+    "test:edge-runtime": "bash scripts/test_guest_invite_runtime.sh"
   }
 }

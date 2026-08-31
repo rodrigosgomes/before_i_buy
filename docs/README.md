@@ -31,6 +31,8 @@ The private, invite-link MVP should test this loop with real friend groups. A pu
 | Delivery | [Quality process and merge](06-delivery/quality-process.md) | Mandatory task/PR process, test strategy, CI gates, adversarial review, and branch protection |
 | Delivery | [Definition of Done](06-delivery/definition-of-done.md) | Shared merge contract for scope, tests, coverage, security, and review |
 | Delivery | [Supabase CLI local](06-delivery/supabase-cli-setup.md) | Reproducible local database commands and remote-operation safety boundaries |
+| Delivery | [Task 0 — guest session and RLS foundation](06-delivery/tasks/T0-guest-session-and-rls-foundation.md) | Approved implementation plan to remove direct guest access and establish a one-dilemma guest session |
+| Delivery | [Guest invite external-beta gate](06-delivery/guest-invite-external-beta-gate.md) | Required rate-limit, cookie-origin, and privacy evidence before exposing guest invites externally |
 | Marketing | [Marketing and monetization](07-marketing/README.md) | Recommended revenue sequence, social-platform patterns, emotional game mechanics, pricing, and experiments |
 | Marketing | [Monetization strategy](07-marketing/monetization-strategy.md) | Subscription, Circle Pass, cosmetics, creator economy, commercial models, and guardrails |
 | Marketing | [Game mechanics and emotional value](07-marketing/game-mechanics-and-emotional-value.md) | Ethical use of vanity, satisfaction, influence, belonging, curiosity, reciprocity, and mastery |

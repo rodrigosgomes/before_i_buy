@@ -38,16 +38,29 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: 2.114.0
+      - name: Install backend test dependencies
+        run: npm ci
       - name: Start isolated Supabase stack
         run: supabase start
       - name: Apply local migrations
         run: supabase migration up --local
       - name: Run pgTAP policy tests
         run: supabase test db
+      - name: Run guest-session concurrency test
+        run: npm run test:db-concurrency
+      - name: Run Edge Function contract tests
+        run: npm run test:edge-contract
+      - name: Run Edge Function runtime smoke test
+        run: npm run test:edge-runtime
       - name: Stop isolated Supabase stack
         if: always()
         run: supabase stop --no-backup

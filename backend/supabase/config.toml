@@ -18,3 +18,6 @@ port = 56324
 
 [analytics]
 port = 56327
+
+[functions.guest-invite]
+verify_jwt = false
