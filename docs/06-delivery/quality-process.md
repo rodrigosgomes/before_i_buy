@@ -35,7 +35,7 @@ Cobertura mínima é 80% por superfície modificada. Não use uma cobertura agre
 | Superfície | Gate local e CI | Estado atual |
 |---|---|---|
 | Repositório | `git diff --check` | ativo agora |
-| Banco Supabase | `cd backend && npm run db:start && npm run db:test` | ativo agora; pgTAP fica em `backend/supabase/tests/database/` |
+| Banco Supabase | `cd backend`, depois `npm run db:start`, `npm run db:migrate` e `npm run db:test` | ativo agora; pgTAP fica em `backend/supabase/tests/database/` |
 | Flutter mobile | `flutter pub get`, formatação, `flutter analyze`, `flutter test --coverage`, cobertura >=80% | ativa quando `apps/mobile/pubspec.yaml` existir |
 | Web convidado | `npm ci`, `npm run lint`, `npm run test:coverage`, cobertura >=80% | ativa quando `apps/guest-web/package-lock.json` existir |
 | E2E web crítico | `npm run e2e:critical` com Playwright | ativa com o projeto web; o script é obrigatório |

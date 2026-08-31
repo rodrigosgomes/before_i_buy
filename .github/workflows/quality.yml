@@ -44,7 +44,9 @@ jobs:
           version: 2.114.0
       - name: Start isolated Supabase stack
         run: supabase start
-      - name: Run migrations and pgTAP policy tests
+      - name: Apply local migrations
+        run: supabase migration up --local
+      - name: Run pgTAP policy tests
         run: supabase test db
       - name: Stop isolated Supabase stack
         if: always()

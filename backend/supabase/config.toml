@@ -1,1 +1,20 @@
 project_id = "before-i-buy"
+
+# Keep this local stack independent from the other Supabase projects that can
+# run on the same development machine. Default Supabase ports are commonly in
+# use by another project, so Before I Buy uses the 563xx range instead.
+[api]
+port = 56321
+
+[db]
+port = 56322
+shadow_port = 56320
+
+[studio]
+port = 56323
+
+[local_smtp]
+port = 56324
+
+[analytics]
+port = 56327

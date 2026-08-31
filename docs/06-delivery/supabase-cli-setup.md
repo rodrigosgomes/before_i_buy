@@ -6,6 +6,16 @@ Esta configuração opera somente a stack local Docker do repositório. Ela não
 
 O projeto local é `backend/`; a configuração e migrations ficam em `backend/supabase/`. A versão da CLI está fixada em `backend/package.json` e deve acompanhar a versão usada no workflow de CI.
 
+Para coexistir com outras stacks Supabase na mesma máquina, este projeto usa portas locais próprias:
+
+| Serviço | Porta |
+| --- | ---: |
+| API | `56321` |
+| Postgres | `56322` |
+| Studio | `56323` |
+| Mailpit (e-mail local) | `56324` |
+| Analytics | `56327` |
+
 ## Pré-requisitos
 
 - Node.js 24 ou superior;
@@ -20,9 +30,12 @@ No Linux, confirme primeiro `docker info`. Se houver erro de permissão no socke
 cd backend
 npm install
 npm run db:start
+npm run db:migrate
 npm run db:status
 npm run db:test
 ```
+
+`db:start` apenas sobe a stack Docker. `db:migrate` aplica migrations pendentes somente no Postgres local e é seguro repetir; use-o antes de testar uma stack criada pela primeira vez.
 
 Pare a stack ao terminar:
 
