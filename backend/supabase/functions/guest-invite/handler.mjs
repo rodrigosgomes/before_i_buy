@@ -5,10 +5,33 @@ const privacyHeaders = {
   "X-Robots-Tag": "noindex, nofollow",
 };
 
-function unavailableInviteResponse() {
+const guestSessionCookieName = "before_i_buy_guest_session";
+const votePredictions = new Set(["buy", "wait", "skip"]);
+
+function responseHeaders() {
+  return new Headers(privacyHeaders);
+}
+
+function isAllowedOrigin(request, allowedOrigin) {
+  const origin = request.headers.get("origin");
+  return origin === null || origin === allowedOrigin;
+}
+
+function unavailableInviteResponse(
+  status = 404,
+  request,
+  allowedOrigin,
+) {
   return new Response(JSON.stringify({ error: "invite_unavailable" }), {
-    status: 404,
-    headers: privacyHeaders,
+    status,
+    headers: responseHeaders(request, allowedOrigin),
+  });
+}
+
+function unavailableVoteResponse(status = 404, request, allowedOrigin) {
+  return new Response(JSON.stringify({ error: "vote_unavailable" }), {
+    status,
+    headers: responseHeaders(request, allowedOrigin),
   });
 }
 
@@ -30,6 +53,30 @@ export function createGuestSessionSecret() {
   return base64Url(bytes);
 }
 
+export async function createRateLimitKey(scope, subject, secret) {
+  const encoder = new TextEncoder();
+  const secretBytes = encoder.encode(secret);
+  if (secretBytes.length < 32) {
+    throw new Error("Rate-limit secret must contain at least 32 bytes.");
+  }
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    secretBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const digest = new Uint8Array(await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(`${scope}\u0000${subject}`),
+  ));
+  return [...digest]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function serializeSessionCookie(secret, maxAge) {
   return [
     `before_i_buy_guest_session=${secret}`,
@@ -42,7 +89,48 @@ function serializeSessionCookie(secret, maxAge) {
 }
 
 function isPlausibleInviteToken(value) {
-  return typeof value === "string" && value.length >= 16 && value.length <= 512;
+  return typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value);
+}
+
+function isUuid(value) {
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      .test(value);
+}
+
+function readGuestSessionSecret(request) {
+  const cookieHeader = request.headers.get("cookie");
+  if (!cookieHeader) return null;
+
+  for (const entry of cookieHeader.split(";")) {
+    const separator = entry.indexOf("=");
+    if (separator < 0) continue;
+    const name = entry.slice(0, separator).trim();
+    if (name !== guestSessionCookieName) continue;
+    const value = entry.slice(separator + 1).trim();
+    return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : null;
+  }
+
+  return null;
+}
+
+function isValidVoteProjection(projection) {
+  if (!projection || typeof projection !== "object") return false;
+  if (!votePredictions.has(projection.prediction)) return false;
+  if (typeof projection.changed !== "boolean") return false;
+
+  const counts = [
+    projection.buy_count,
+    projection.wait_count,
+    projection.skip_count,
+    projection.total_votes,
+  ];
+  if (!counts.every((count) => Number.isSafeInteger(count) && count >= 0)) {
+    return false;
+  }
+
+  return projection.buy_count + projection.wait_count + projection.skip_count ===
+    projection.total_votes;
 }
 
 export async function handleGuestInvite(
@@ -50,40 +138,63 @@ export async function handleGuestInvite(
   {
     openGuestInviteSession,
     createSessionSecret = createGuestSessionSecret,
+    deriveRateLimitKey,
+    allowedOrigin,
     now = () => new Date(),
   },
 ) {
+  if (!isAllowedOrigin(request, allowedOrigin)) {
+    return unavailableInviteResponse(404, request, allowedOrigin);
+  }
+
   if (request.method !== "POST") {
-    return unavailableInviteResponse();
+    return unavailableInviteResponse(404, request, allowedOrigin);
   }
 
   let payload;
   try {
     payload = await request.json();
   } catch {
-    return unavailableInviteResponse();
+    return unavailableInviteResponse(404, request, allowedOrigin);
   }
 
   if (!isPlausibleInviteToken(payload?.inviteToken)) {
-    return unavailableInviteResponse();
+    return unavailableInviteResponse(404, request, allowedOrigin);
   }
 
   const sessionSecret = createSessionSecret();
+  let rateLimitKey;
+  try {
+    rateLimitKey = await deriveRateLimitKey("invite_open", payload.inviteToken);
+  } catch {
+    return unavailableInviteResponse(404, request, allowedOrigin);
+  }
+
   let projection;
   try {
-    projection = await openGuestInviteSession(payload.inviteToken, sessionSecret);
+    projection = await openGuestInviteSession(
+      payload.inviteToken,
+      sessionSecret,
+      rateLimitKey,
+    );
   } catch {
-    return unavailableInviteResponse();
+    return unavailableInviteResponse(404, request, allowedOrigin);
   }
 
   if (!projection || typeof projection !== "object") {
-    return unavailableInviteResponse();
+    return unavailableInviteResponse(404, request, allowedOrigin);
+  }
+  if (projection.rate_limited === true) {
+    return unavailableInviteResponse(429, request, allowedOrigin);
+  }
+  if (projection.rate_limited !== false) {
+    return unavailableInviteResponse(404, request, allowedOrigin);
   }
 
   const expiresAt = new Date(projection.expires_at);
   const maxAge = Math.floor((expiresAt.getTime() - now().getTime()) / 1000);
   if (!Number.isFinite(expiresAt.getTime()) || maxAge <= 0) {
-    return unavailableInviteResponse();
+    return unavailableInviteResponse(404, request, allowedOrigin);
   }
 
   const dilemma = {
@@ -98,11 +209,105 @@ export async function handleGuestInvite(
     pause_due_at: projection.pause_due_at,
     state: projection.state,
   };
-  const headers = new Headers(privacyHeaders);
+  const headers = responseHeaders(request, allowedOrigin);
   headers.set("Set-Cookie", serializeSessionCookie(sessionSecret, maxAge));
 
   return new Response(JSON.stringify({ dilemma }), {
     status: 200,
     headers,
   });
+}
+
+export async function handleGuestVote(
+  request,
+  { submitGuestVote, deriveRateLimitKey, allowedOrigin },
+) {
+  if (!isAllowedOrigin(request, allowedOrigin)) {
+    return unavailableVoteResponse(404, request, allowedOrigin);
+  }
+
+  if (request.method !== "POST") {
+    return unavailableVoteResponse(404, request, allowedOrigin);
+  }
+
+  const sessionSecret = readGuestSessionSecret(request);
+  if (!sessionSecret) {
+    return unavailableVoteResponse(404, request, allowedOrigin);
+  }
+
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return unavailableVoteResponse(404, request, allowedOrigin);
+  }
+
+  if (!isUuid(payload?.dilemmaId) || !votePredictions.has(payload?.prediction)) {
+    return unavailableVoteResponse(404, request, allowedOrigin);
+  }
+
+  let rateLimitKey;
+  try {
+    rateLimitKey = await deriveRateLimitKey("guest_vote", sessionSecret);
+  } catch {
+    return unavailableVoteResponse(404, request, allowedOrigin);
+  }
+
+  let projection;
+  try {
+    projection = await submitGuestVote(
+      payload.dilemmaId,
+      sessionSecret,
+      payload.prediction,
+      rateLimitKey,
+    );
+  } catch {
+    return unavailableVoteResponse(404, request, allowedOrigin);
+  }
+
+  if (projection?.rate_limited === true) {
+    return unavailableVoteResponse(429, request, allowedOrigin);
+  }
+
+  if (
+    projection?.rate_limited !== false ||
+    !isValidVoteProjection(projection) ||
+    projection.prediction !== payload.prediction
+  ) {
+    return unavailableVoteResponse(404, request, allowedOrigin);
+  }
+
+  return new Response(JSON.stringify({
+    vote: {
+      prediction: projection.prediction,
+      changed: projection.changed,
+    },
+    aggregates: {
+      buy: projection.buy_count,
+      wait: projection.wait_count,
+      skip: projection.skip_count,
+      total: projection.total_votes,
+    },
+  }), {
+    status: 200,
+    headers: responseHeaders(request, allowedOrigin),
+  });
+}
+
+export function handleGuestInviteRequest(request, dependencies) {
+  const pathname = new URL(request.url).pathname.replace(/\/+$/, "");
+  const isVotePath =
+    pathname === "/functions/v1/guest-invite/vote" ||
+    pathname === "/guest-invite/vote";
+  const isOpenPath =
+    pathname === "/functions/v1/guest-invite" ||
+    pathname === "/guest-invite";
+
+  if (isVotePath) {
+    return handleGuestVote(request, dependencies);
+  }
+  if (isOpenPath) {
+    return handleGuestInvite(request, dependencies);
+  }
+  return unavailableInviteResponse(404, request, dependencies.allowedOrigin);
 }

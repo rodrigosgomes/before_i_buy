@@ -1,34 +1,33 @@
 # Gate de beta externo — limite de taxa de convite
 
-**Status:** bloqueador de liberação; não implementado na Task 0.
+**Status:** limite e validação de origem implementados localmente na Task 1;
+proxy same-origin, configuração no alvo e revisão de liberação ainda pendentes.
 
-A Edge Function `guest-invite` não pode ser exposta para beta externo antes de
-um limitador efêmero ser configurado e testado. A fundação atual não coleta IP,
-device fingerprint, contato ou identificador persistente de convidado.
+A Edge Function `guest-invite` não coleta IP, device fingerprint, contato ou
+identificador persistente de convidado. A Task 1 implementa localmente o limite
+definido na DEC-010; isso ainda não autoriza deploy ou beta externo.
 
 ## Integração exigida antes do beta
 
-1. Na Edge Function, derivar uma chave de limite com HMAC e um segredo do
-   ambiente a partir do token de convite. Nunca persistir nem registrar o token
-   em texto claro.
-2. Consultar um contador com TTL no provedor de limite escolhido antes de abrir
-   a sessão. O TTL nunca pode ultrapassar `pause_due_at`.
-3. Aplicar também um limite curto para tentativas que já tenham uma sessão
-   válida, usando uma chave derivada do segredo opaco da sessão.
-4. Em bloqueio, devolver a mesma resposta genérica, os mesmos headers de
-   privacidade e nenhum cookie; não transformar IP em identidade de produto.
-5. Liberar o domínio web somente depois de configurar uma origem explícita para
-   requisições com credenciais. Não aceitar `Access-Control-Allow-Origin: *`
-   junto de cookies em produção.
+1. Configurar `GUEST_RATE_LIMIT_SECRET` com ao menos 32 bytes em cada ambiente;
+   não reutilizar token, JWT ou chave de serviço para essa finalidade.
+2. Configurar uma única `GUEST_WEB_ORIGIN` HTTPS, sem path, query ou fragmento,
+   e publicar a rota por reverse proxy no mesmo domínio do cliente web,
+   preservando `Set-Cookie` e `/functions/v1/guest-invite`. O navegador não
+   chama diretamente o domínio Supabase.
+3. Confirmar que outra origem falha antes da RPC e que o proxy não injeta CORS
+   com credenciais nem amplia o `Path` do cookie.
+4. Aplicar as migrations e comprovar no ambiente alvo os limiares da DEC-010,
+   TTL limitado ao prazo e resposta genérica `429` sem cookie.
 
 ## Evidência necessária para liberar
 
-- decisão registrada sobre provedor, janelas e limiares;
-- teste de limiar, expiração do contador, convite revogado e resposta `429`
+- DEC-010 e testes locais de limiar, TTL, convite revogado e resposta `429`
   sem token, segredo ou dado do dilema;
+- configuração e smoke equivalentes no ambiente alvo;
 - revisão de Segurança/LGPD confirmando que a chave é efêmera e não cria perfil
   de convidado; e
 - E2E de convite → voto e link revogado da Task 1 aprovado.
 
-Até esses itens existirem, a função permanece apenas em desenvolvimento local
-e não recebe URL pública de beta.
+Até os itens pendentes existirem, a função permanece apenas em desenvolvimento
+local e não recebe URL pública de beta.

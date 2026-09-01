@@ -1,5 +1,21 @@
 # Closed-loop screen concepts
 
+## Current Entrega 1 specifications
+
+For the approved first delivery, agents must use these implementation-oriented
+documents before the broader closed-loop concept boards below:
+
+- [Shared design-system contract](e1-design-system-contract.md) — canonical
+  tokens, `Bib*` component contracts, Material 3/MUI mapping, fixtures, and
+  cross-agent handoff rules.
+- [11-screen agent prompts](e1-11-screen-agent-prompts.md) — master prompt,
+  common foundation task, screen-specific tasks, copy, states, accessibility,
+  sequencing, and adversarial review gates.
+
+The concept boards in this directory cover later closed-loop stages and may
+contain elements that are explicitly outside Entrega 1. The mini-PRD and
+Decision Log take precedence.
+
 These high-fidelity concept boards translate the approved Before I Buy experience into eight primary mobile pages.
 
 They are product-direction artifacts, not implementation-ready specifications. Exact layout, interaction states, accessibility behavior, Portuguese localization, and component tokens still require design-system work and usability testing.
@@ -59,4 +75,3 @@ They are product-direction artifacts, not implementation-ready specifications. E
 7. Validate emotional tone with the intended adult Brazilian audience.
 
 The exact generation briefs are preserved in [Generation prompts](generation-prompts.md).
-

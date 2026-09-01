@@ -121,3 +121,37 @@ Cada entrada segue o padrão:
 - **Decisão:** A primeira entrega técnica cobre rascunho local explícito, publicação privada, convite revogável e voto anônimo de convidado. Ela preserva os contratos de estado para `decision_due`, mas não implementa decisão, reflexão, Reveal, pontuação, IA, imagens, URLs, razões de voto ou coleta de contato do convidado.
 - **Consequências:** A equipe consegue testar as duas primeiras transições com privacidade e autorização completas. As entregas seguintes devem adicionar o restante do loop sem reinterpretar votos já persistidos.
 - **Gatilho de Revisão:** A entrega só é ampliada antes da conclusão se os testes mostrarem que ausência de mídia, URL ou razão de voto impede materialmente a compreensão ou conversão.
+
+---
+
+### DEC-010: Tokens de Convite Gerados no Servidor e Limite Efêmero sem IP
+- **Data:** 2026-08-31
+- **Status:** `Aceito`
+- **Contexto:** A borda pública de convite precisa impedir tokens previsíveis e abuso de abertura/voto sem transformar IP, device fingerprint ou contato em identidade de produto.
+- **Decisão:**
+  1. A RPC autenticada de publicação gera 32 bytes criptograficamente aleatórios no servidor, retorna o token Base64URL de 43 caracteres uma única vez ao criador e persiste somente SHA-256.
+  2. A Edge Function deriva chaves HMAC-SHA-256 separadas por escopo, usando segredo de ambiente com ao menos 32 bytes; token e segredo de sessão nunca são usados como chave persistida.
+  3. PostgreSQL mantém contadores com RLS deny-by-default e TTL máximo de 60 segundos, sempre limitado ao prazo do dilema/sessão: até 30 aberturas por convite/minuto e até 10 submissões por sessão/minuto.
+  4. Contadores vencidos são removidos oportunisticamente; não coletamos IP, fingerprint, nome ou contato. Excesso devolve `429` com corpo genérico e headers de privacidade.
+- **Consequências:** A primeira entrega fecha os dois vetores críticos sem provedor externo nem novo identificador pessoal. O limite por convite é compartilhado entre convidados e pode produzir bloqueio temporário em picos acima de 30 aberturas por minuto.
+- **Gatilho de Revisão:** Tráfego real mostrar falsos positivos, abuso distribuído que contorne a chave por convite/sessão ou necessidade operacional de um contador externo multi-região.
+
+---
+
+### DEC-011: Publicação Idempotente com Token Derivado por Chave no Vault
+- **Data:** 2026-08-31
+- **Status:** `Aceito`
+- **Contexto:** A publicação recebe uma chave de idempotência para tolerar timeout e retry, mas um token aleatório retornado apenas uma vez não pode ser repetido sem guardar seu valor bruto. Criar outro dilema viola o contrato; guardar o token em texto claro viola a DEC-003.
+- **Decisão:** O servidor cria e mantém no Supabase Vault uma chave aleatória de 256 bits. A RPC deriva deterministicamente o token Base64URL com HMAC-SHA-256 sobre versão do contrato, `owner_id` e `client_idempotency_key`, serializa retries e impõe unicidade por dono/chave. O mesmo payload repete o mesmo `dilemma_id` e token; payload diferente falha fechado. Somente o SHA-256 do token é persistido na tabela de produto. Esta decisão substitui apenas a geração aleatória por chamada descrita no item 1 da DEC-010; os demais limites e regras permanecem.
+- **Consequências:** Retry após resposta perdida é seguro sem duplicar dilema nem persistir o token recuperável. A chave do Vault passa a ser segredo operacional crítico e deve participar de backup, controle de acesso e rotação planejada; rotação sem estratégia invalidaria o replay de publicações anteriores.
+- **Gatilho de Revisão:** Mudança de provedor de segredos, necessidade de rotação da chave ou adoção de um serviço dedicado de idempotência/publicação.
+
+---
+
+### DEC-012: Proxy Same-Origin para o Cookie do Convidado
+- **Data:** 2026-09-01
+- **Status:** `Aceito`
+- **Contexto:** A página web e a Edge Function são clientes separados, mas o cookie de voto não deve depender de third-party cookies, `SameSite=None` ou CORS com credenciais. O runtime local do Supabase também intercepta preflight com origem ampla, inadequada para esse segredo.
+- **Decisão:** O navegador acessa `/functions/v1/guest-invite` por reverse proxy no mesmo domínio da página web, preservando path e `Set-Cookie`. A Edge não oferece contrato CORS para chamada direta do navegador. Cada ambiente configura exatamente uma `GUEST_WEB_ORIGIN`, HTTPS fora de localhost, e POSTs com `Origin` diferente são negados antes da RPC. O cookie permanece `Secure; HttpOnly; SameSite=Strict` e restrito a `Path=/functions/v1/guest-invite`. Chamadas sem `Origin` existem somente para smoke e integrações servidor-servidor que já possuam o segredo.
+- **Consequências:** O fluxo não depende de cookies cross-site e mantém defesa CSRF por `SameSite=Strict` mais validação de origem. O reverse proxy e a preservação de headers/caminho tornam-se pré-requisitos do cliente web e do beta externo.
+- **Gatilho de Revisão:** Mudança do host web, múltiplos domínios legítimos ou plataforma de proxy incapaz de preservar `Set-Cookie` e path.

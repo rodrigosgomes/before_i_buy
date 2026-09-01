@@ -77,7 +77,11 @@ begin
     into v_projection
     from public.open_guest_invite_session(
       p_invite_token_plain,
-      p_session_secret_plain
+      p_session_secret_plain,
+      encode(
+        extensions.digest('open:' || p_invite_token_plain, 'sha256'),
+        'hex'
+      )
     ) s;
   reset role;
   return v_projection;
@@ -211,7 +215,7 @@ values
     24,
     now() + interval '2 days',
     'collecting_votes',
-    encode(extensions.digest('invite-token-alpha', 'sha256'), 'hex'),
+    encode(extensions.digest(repeat('A', 43), 'sha256'), 'hex'),
     false
   ),
   (
@@ -226,7 +230,7 @@ values
     24,
     now() + interval '2 days',
     'collecting_votes',
-    encode(extensions.digest('invite-token-bravo', 'sha256'), 'hex'),
+    encode(extensions.digest(repeat('B', 43), 'sha256'), 'hex'),
     false
   );
 
@@ -258,7 +262,7 @@ values
     24,
     now() + interval '2 days',
     'collecting_votes',
-    encode(extensions.digest('invite-token-charlie', 'sha256'), 'hex'),
+    encode(extensions.digest(repeat('C', 43), 'sha256'), 'hex'),
     true
   ),
   (
@@ -273,7 +277,7 @@ values
     24,
     now() + interval '2 days',
     'decision_due',
-    encode(extensions.digest('invite-token-delta', 'sha256'), 'hex'),
+    encode(extensions.digest(repeat('D', 43), 'sha256'), 'hex'),
     false
   ),
   (
@@ -288,7 +292,7 @@ values
     24,
     now() + interval '2 days',
     'moderation_hidden',
-    encode(extensions.digest('invite-token-echo', 'sha256'), 'hex'),
+    encode(extensions.digest(repeat('E', 43), 'sha256'), 'hex'),
     false
   ),
   (
@@ -303,7 +307,7 @@ values
     24,
     now() - interval '1 second',
     'collecting_votes',
-    encode(extensions.digest('invite-token-foxtrot', 'sha256'), 'hex'),
+    encode(extensions.digest(repeat('F', 43), 'sha256'), 'hex'),
     false
   ),
   (
@@ -318,7 +322,7 @@ values
     24,
     now() + interval '2 days',
     'collecting_votes',
-    encode(extensions.digest('invite-token-golf', 'sha256'), 'hex'),
+    encode(extensions.digest(repeat('G', 43), 'sha256'), 'hex'),
     false
   );
 
@@ -473,7 +477,7 @@ select ok(
 select is(
   has_function_privilege(
     'anon',
-    'public.open_guest_invite_session(text, text)',
+    'public.open_guest_invite_session(text, text, text)',
     'execute'
   ),
   false,
@@ -483,7 +487,7 @@ select is(
 select ok(
   has_function_privilege(
     'service_role',
-    'public.open_guest_invite_session(text, text)',
+    'public.open_guest_invite_session(text, text, text)',
     'execute'
   ),
   'only the service role can execute the invite-session RPC'
@@ -508,7 +512,7 @@ select is(
 select is(
   has_function_privilege(
     'anon',
-    'public.publish_dilemma(varchar, bigint, varchar, public.item_category, public.purchase_purpose, text, text, text, varchar, integer, text, uuid)',
+    'public.publish_dilemma(varchar, bigint, varchar, public.item_category, public.purchase_purpose, text, varchar, integer, uuid)',
     'execute'
   ),
   false,
@@ -518,7 +522,7 @@ select is(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.publish_dilemma(varchar, bigint, varchar, public.item_category, public.purchase_purpose, text, text, text, varchar, integer, text, uuid)',
+    'public.publish_dilemma(varchar, bigint, varchar, public.item_category, public.purchase_purpose, text, varchar, integer, uuid)',
     'execute'
   ),
   'authenticated can execute publish_dilemma'
@@ -557,8 +561,8 @@ select is_empty(
 select is_empty(
   $$select projection
       from (select pg_temp.open_guest_invite_as_service(
-        'invite-token-charlie',
-        'test-secret-0000000000000000000000000000000000000000003'
+        repeat('C', 43),
+        repeat('3', 43)
       ) as projection) result
      where projection is not null$$,
   'a revoked invite returns no projection'
@@ -567,8 +571,8 @@ select is_empty(
 select is_empty(
   $$select projection
       from (select pg_temp.open_guest_invite_as_service(
-        'invite-token-delta',
-        'test-secret-0000000000000000000000000000000000000000004'
+        repeat('D', 43),
+        repeat('4', 43)
       ) as projection) result
      where projection is not null$$,
   'an invite outside collecting_votes returns no projection'
@@ -577,8 +581,8 @@ select is_empty(
 select is_empty(
   $$select projection
       from (select pg_temp.open_guest_invite_as_service(
-        'invite-token-echo',
-        'test-secret-0000000000000000000000000000000000000000005'
+        repeat('E', 43),
+        repeat('5', 43)
       ) as projection) result
      where projection is not null$$,
   'a moderation-hidden invite returns no projection'
@@ -587,8 +591,8 @@ select is_empty(
 select is_empty(
   $$select projection
       from (select pg_temp.open_guest_invite_as_service(
-        'invite-token-foxtrot',
-        'test-secret-0000000000000000000000000000000000000000006'
+        repeat('F', 43),
+        repeat('6', 43)
       ) as projection) result
      where projection is not null$$,
   'an expired invite returns no projection'
@@ -608,8 +612,8 @@ select is(
 
 select lives_ok(
   $$select pg_temp.open_guest_invite_as_service(
-    'invite-token-alpha',
-    'test-secret-0000000000000000000000000000000000000000001'
+    repeat('A', 43),
+    repeat('1', 43)
   )$$,
   'a valid invite can create a server-side guest session'
 );
@@ -624,7 +628,7 @@ select is(
 select is(
   (select session_secret_hash::text from public.guest_access_sessions
    where dilemma_id = '10000000-0000-4000-8000-000000000001'),
-  encode(extensions.digest('test-secret-0000000000000000000000000000000000000000001', 'sha256'), 'hex')::text,
+  encode(extensions.digest(repeat('1', 43), 'sha256'), 'hex')::text,
   'only the SHA-256 hash of the guest secret is stored'
 );
 
@@ -655,8 +659,8 @@ select is(
   (
     select array_agg(key order by key)
       from jsonb_object_keys(pg_temp.open_guest_invite_as_service(
-        'invite-token-alpha',
-        'test-secret-0000000000000000000000000000000000000000002'
+        repeat('A', 43),
+        repeat('2', 43)
       )) as key
   ) && array['total_votes', 'image_url', 'product_url', 'invite_token_hash', 'session_secret_hash'],
   false,
@@ -667,7 +671,7 @@ select is_empty(
   $$select projection
       from (select pg_temp.get_guest_invite_as_service(
         '10000000-0000-4000-8000-000000000002',
-        'test-secret-0000000000000000000000000000000000000000001'
+        repeat('1', 43)
       ) as projection) result
      where projection is not null$$,
   'a guest session cannot be used for a different dilemma'
@@ -675,8 +679,8 @@ select is_empty(
 
 select lives_ok(
   $$select pg_temp.open_guest_invite_as_service(
-    'invite-token-golf',
-    'test-secret-0000000000000000000000000000000000000000007'
+    repeat('G', 43),
+    repeat('7', 43)
   )$$,
   'an active invite can create a session before dilemma deletion'
 );
@@ -694,8 +698,8 @@ select is(
 select is_empty(
   $$select projection
       from (select pg_temp.open_guest_invite_as_service(
-        'invite-token-golf',
-        'test-secret-0000000000000000000000000000000000000000007'
+        repeat('G', 43),
+        repeat('7', 43)
       ) as projection) result
      where projection is not null$$,
   'a deleted invite returns no projection and creates no session'
@@ -709,7 +713,7 @@ insert into public.guest_access_sessions (
 )
 values (
   '10000000-0000-4000-8000-000000000001',
-  encode(extensions.digest('expired-secret-00000000000000000000000000000000000000001', 'sha256'), 'hex'),
+  encode(extensions.digest(repeat('X', 43), 'sha256'), 'hex'),
   now() - interval '2 hours',
   now() - interval '1 second'
 );
@@ -718,7 +722,7 @@ select is_empty(
   $$select projection
       from (select pg_temp.get_guest_invite_as_service(
         '10000000-0000-4000-8000-000000000001',
-        'expired-secret-00000000000000000000000000000000000000001'
+        repeat('X', 43)
       ) as projection) result
      where projection is not null$$,
   'an expired guest session cannot read the invite projection'
@@ -732,7 +736,7 @@ select is_empty(
   $$select projection
       from (select pg_temp.get_guest_invite_as_service(
         '10000000-0000-4000-8000-000000000001',
-        'test-secret-0000000000000000000000000000000000000000001'
+        repeat('1', 43)
       ) as projection) result
      where projection is not null$$,
   'revoking the invite invalidates previously issued guest sessions'
