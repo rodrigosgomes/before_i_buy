@@ -155,3 +155,13 @@ Cada entrada segue o padrão:
 - **Decisão:** O navegador acessa `/functions/v1/guest-invite` por reverse proxy no mesmo domínio da página web, preservando path e `Set-Cookie`. A Edge não oferece contrato CORS para chamada direta do navegador. Cada ambiente configura exatamente uma `GUEST_WEB_ORIGIN`, HTTPS fora de localhost, e POSTs com `Origin` diferente são negados antes da RPC. O cookie permanece `Secure; HttpOnly; SameSite=Strict` e restrito a `Path=/functions/v1/guest-invite`. Chamadas sem `Origin` existem somente para smoke e integrações servidor-servidor que já possuam o segredo.
 - **Consequências:** O fluxo não depende de cookies cross-site e mantém defesa CSRF por `SameSite=Strict` mais validação de origem. O reverse proxy e a preservação de headers/caminho tornam-se pré-requisitos do cliente web e do beta externo.
 - **Gatilho de Revisão:** Mudança do host web, múltiplos domínios legítimos ou plataforma de proxy incapaz de preservar `Set-Cookie` e path.
+
+---
+
+### DEC-013: Autenticação do Criador por Magic Link de E-mail
+- **Data:** 2026-09-01
+- **Status:** `Aceito`
+- **Contexto:** A publicação privada exige autoria recuperável e um perfil com confirmação de maioridade e consentimentos. Senha, SMS e provedores sociais acrescentariam recuperação, custo, dados ou integrações que não ajudam a validar a Entrega 1.
+- **Decisão:** O criador entra por magic link de e-mail via Supabase Auth. O e-mail serve somente à autenticação; não entra em perfil público, analytics, convites, voto ou comunicação de convidado. Após a primeira sessão, o app exige nome de exibição, autoafirmação +18 e aceite separado de Termos/Aviso antes de permitir a publicação. O cliente recebe apenas URL e chave pública por configuração de ambiente; `service_role` permanece exclusiva do backend.
+- **Consequências:** O fluxo evita senha e mantém a identidade do criador recuperável, mas requer configuração segura de redirecionamento e envio de e-mail em cada ambiente. A cópia, versão e base legal de Termos/Aviso continuam bloqueadores de beta externo; builds internos usam configuração explicitamente marcada como não-beta.
+- **Gatilho de Revisão:** Baixa conversão de entrada, custo/entregabilidade de e-mail ou necessidade comprovada de login social.
