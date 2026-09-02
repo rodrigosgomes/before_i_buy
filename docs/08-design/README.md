@@ -28,7 +28,7 @@ They are product-direction artifacts, not implementation-ready specifications. E
 ![Before I Buy screens 1–4: Temptation, friend predictions, pause, and decision update](images/closed-loop-01-04-decision-phase.png)
 
 | Stage | Page | Primary emotional job | Main interaction |
-|---:|---|---|---|
+| ---: | --- | --- | --- |
 | 1 | Temptation | Move desire into a calmer, structured space | Capture item, reason, pause, and audience |
 | 2 | Friend predictions | Invite useful perspective without anchoring | Predict Buy, Wait, or Skip and optionally explain |
 | 3 | Pause | Preserve agency while anticipation builds | Review perspectives without urgency |
@@ -39,7 +39,7 @@ They are product-direction artifacts, not implementation-ready specifications. E
 ![Before I Buy screens 5–8: later reflection, Reveal, prediction reputation, and personal insight](images/closed-loop-05-08-learning-phase.png)
 
 | Stage | Page | Primary emotional job | Main interaction |
-|---:|---|---|---|
+| ---: | --- | --- | --- |
 | 5 | Later reflection | Compare expectation with lived experience | Record kept/returned and same-choice-again outcome |
 | 6 | Reveal | Close the social loop without declaring winners and losers | See decision, reflection, group prediction, and personal alignment |
 | 7 | Prediction reputation | Build private mastery and social identity | Review resolved, aligned, different, and unresolved predictions |
