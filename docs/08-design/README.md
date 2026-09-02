@@ -11,6 +11,9 @@ documents before the broader closed-loop concept boards below:
 - [11-screen agent prompts](e1-11-screen-agent-prompts.md) — master prompt,
   common foundation task, screen-specific tasks, copy, states, accessibility,
   sequencing, and adversarial review gates.
+- [Flutter handoff from the local Figma Make export](e1-flutter-handoff.md) —
+  source precedence, reusable visual anatomy, screen-by-screen mobile mapping,
+  implementation sequence, and planned validation for the creator flow.
 
 The concept boards in this directory cover later closed-loop stages and may
 contain elements that are explicitly outside Entrega 1. The mini-PRD and
