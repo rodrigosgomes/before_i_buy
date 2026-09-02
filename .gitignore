@@ -10,3 +10,14 @@ backend/supabase/.branches/
 
 # Node tooling for the backend
 backend/node_modules/
+
+# Guest web generated artifacts
+apps/guest-web/node_modules/
+apps/guest-web/.next/
+apps/guest-web/coverage/
+apps/guest-web/test-results/
+apps/guest-web/playwright-report/
+apps/guest-web/tsconfig.tsbuildinfo
+
+# Local agent telemetry
+.github/context-mode/sessions/

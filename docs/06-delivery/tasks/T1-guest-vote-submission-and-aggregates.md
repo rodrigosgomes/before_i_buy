@@ -1,7 +1,7 @@
 # Task 1 — voto de convidado e agregados pós-voto
 
-**Status:** implementação backend validada; integração browser bloqueada pelo
-proxy same-origin da futura task Web  
+**Status:** implementação backend e integração browser local validadas; beta
+externo permanece sujeito ao gate operacional
 **Tipo:** vertical slice de produto, segurança e banco  
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)  
 **Depende de:** [Task 0 — sessão de convidado e fundação RLS](T0-guest-session-and-rls-foundation.md)
@@ -281,13 +281,14 @@ produto aberto para iniciar os testes.
 Todos foram corrigidos e cobertos. A re-revisão final de QA não encontrou
 P0/P1.
 
-### Bloqueador aberto
+### Integração browser concluída localmente
 
-Segurança mantém um P1 de integração, não do handler/RPC: a DEC-012 exige que o
-futuro cliente Web publique `/functions/v1/guest-invite` por reverse proxy no
-mesmo domínio, preservando `Set-Cookie` e o path. Como `apps/guest-web` ainda não
-existe e é não-escopo desta task, não há configuração de proxy nem E2E de
-navegador para provar esse contrato. Portanto, esta task não atende ainda ao
-item “revisão sem P0/P1 aberto” da Definition of Done e não está pronta para
-merge/liberação como fluxo browser. O bloqueador também permanece no
-[gate de beta externo](../guest-invite-external-beta-gate.md).
+A [Task 2 — web de convidado e proxy same-origin](T2-guest-web-same-origin-voting.md)
+implementou a DEC-012 em `apps/guest-web`: o browser usa somente os caminhos
+same-origin, o proxy preserva `Origin`, cookie, `Set-Cookie` e o `Path` restrito,
+e o Playwright comprovou `convite → cookie → voto → agregados` e resposta genérica
+para convite indisponível. Isso fecha o P1 de integração local desta task.
+
+O [gate de beta externo](../guest-invite-external-beta-gate.md) continua
+necessário: domínio HTTPS real, segredos/configuração no alvo e smoke no ambiente
+publicado não foram autorizados nem executados.

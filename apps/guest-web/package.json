@@ -1,0 +1,36 @@
+{
+  "name": "before-i-buy-guest-web",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit && eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "e2e:critical": "node scripts/run-critical-e2e.mjs"
+  },
+  "dependencies": {
+    "next": "^16.3.4",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@testing-library/react": "16.3.0",
+    "@types/node": "24.3.0",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "@vitest/coverage-v8": "^3.2.7",
+    "eslint": "9.34.0",
+    "eslint-config-next": "^16.3.4",
+    "jsdom": "26.1.0",
+    "typescript": "5.9.2",
+    "typescript-eslint": "^8.42.0",
+    "vitest": "^3.2.7"
+  }
+}
