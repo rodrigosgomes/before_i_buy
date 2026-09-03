@@ -201,6 +201,12 @@ Flutter and React, even though implementations are independent.
 | `BibLoadingBlock` | Skeleton without sensitive data or excessive layout shift |
 | `BibInlineMessage` | `info`, `success`, `warning`, `error`; announced by assistive technology |
 | `BibBottomActionBar` | Fixed CTA when safe; must yield space to keyboard and enlarged text |
+| `BibConsentChecklist` | Two independent internal-demo acceptances for Terms and Privacy Notice; exposes pending/completed state, labels the copy as legally invalid, and keeps legal links disabled until approved versions exist |
+
+`BibConsentChecklist` is an internal onboarding fixture in Task 3A. It does not
+write to `profiles`, grant publication permission, or represent legally valid
+consent. Its Terms and Privacy Notice controls remain independent, and disabled
+links must be announced as unavailable rather than rendered as actionable text.
 
 ## 6. Material Mapping
 

@@ -1,243 +1,283 @@
 import 'package:flutter/material.dart';
+
+import '../../design_system/bib_components.dart';
+import '../../design_system/bib_theme.dart';
 import 'draft.dart';
 
-class CreatorFlow extends StatefulWidget {
-  const CreatorFlow({super.key});
-  @override
-  State<CreatorFlow> createState() => _CreatorFlowState();
-}
+class CreatorHomeScreen extends StatelessWidget {
+  const CreatorHomeScreen({super.key, required this.onCreate});
 
-class _CreatorFlowState extends State<CreatorFlow> {
-  var stage = 0;
-  var onboarded = false;
-  DraftDilemma draft = const DraftDilemma();
-  @override
-  Widget build(BuildContext c) {
-    if (!onboarded) {
-      return _Onboarding(onDone: () => setState(() => onboarded = true));
-    }
-    return stage == 0
-        ? _Home(onCreate: () => setState(() => stage = 1))
-        : stage == 1
-        ? _Draft(
-            draft: draft,
-            onChanged: (d) => setState(() => draft = d),
-            onReview: () => setState(() => stage = 2),
-          )
-        : _Review(draft: draft, onEdit: () => setState(() => stage = 1));
-  }
-}
+  final VoidCallback onCreate;
 
-class _Shell extends StatelessWidget {
-  const _Shell({required this.child});
-  final Widget child;
   @override
-  Widget build(BuildContext c) => SafeArea(
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: Padding(padding: const EdgeInsets.all(16), child: child),
+  Widget build(BuildContext context) => BibPageShell(
+    scrollable: false,
+    bottom: BibPrimaryButton(
+      label: 'Criar minha primeira tentação',
+      onPressed: onCreate,
+    ),
+    child: LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 56,
+                color: Theme.of(context).colorScheme.primary,
+                semanticLabel: 'Conversa privada',
+              ),
+              const SizedBox(height: BibSpacing.x5),
+              Text(
+                'Um pouco de espaço antes de decidir',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: BibSpacing.x3),
+              const Text(
+                'Organize a vontade, peça perspectiva a pessoas próximas e escolha no seu tempo.',
+              ),
+              const SizedBox(height: BibSpacing.x6),
+              const _Chapter(number: '1', label: 'Conte o que está pensando'),
+              const _Chapter(number: '2', label: 'Ouça perspectivas'),
+              const _Chapter(number: '3', label: 'Decida você'),
+              const SizedBox(height: BibSpacing.x6),
+              const BibPrivacyNotice(
+                title: 'Seu espaço é privado',
+                body:
+                    'Seus dilemas só abrirão para quem receber um link em uma etapa futura.',
+              ),
+            ],
+          ),
+        ),
       ),
     ),
   );
 }
 
-class _Onboarding extends StatefulWidget {
-  const _Onboarding({required this.onDone});
-  final VoidCallback onDone;
+class _Chapter extends StatelessWidget {
+  const _Chapter({required this.number, required this.label});
+  final String number;
+  final String label;
+
   @override
-  State<_Onboarding> createState() => _OnboardingState();
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: BibSpacing.x3),
+    child: Row(
+      children: [
+        CircleAvatar(
+          radius: 18,
+          backgroundColor: BibColors.surfaceSubtle,
+          foregroundColor: BibColors.textPrimary,
+          child: Text(number),
+        ),
+        const SizedBox(width: BibSpacing.x3),
+        Expanded(child: Text(label)),
+      ],
+    ),
+  );
 }
 
-class _OnboardingState extends State<_Onboarding> {
-  final name = TextEditingController();
-  var adult = false, terms = false, privacy = false;
+class DraftScreen extends StatefulWidget {
+  const DraftScreen({
+    super.key,
+    required this.draft,
+    required this.recovered,
+    required this.onChanged,
+    required this.onReview,
+    required this.onBack,
+  });
+
+  final DraftDilemma draft;
+  final bool recovered;
+  final ValueChanged<DraftDilemma> onChanged;
+  final VoidCallback onReview;
+  final VoidCallback onBack;
+
   @override
-  Widget build(BuildContext c) {
-    final ready = name.text.trim().isNotEmpty && adult && terms && privacy;
-    return Scaffold(
-      body: _Shell(
-        child: ListView(
-          children: [
-            Text(
-              'Antes de publicar, vamos deixar tudo claro',
-              style: Theme.of(c).textTheme.headlineMedium,
+  State<DraftScreen> createState() => _DraftScreenState();
+}
+
+class _DraftScreenState extends State<DraftScreen> {
+  late final TextEditingController _itemController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _reasonController;
+  var _showErrors = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _itemController = TextEditingController(text: widget.draft.itemName);
+    _priceController = TextEditingController(
+      text: widget.draft.priceCents == 0
+          ? ''
+          : centsToBrl(widget.draft.priceCents, includeSymbol: false),
+    );
+    _reasonController = TextEditingController(text: widget.draft.reason);
+  }
+
+  @override
+  void dispose() {
+    _itemController.dispose();
+    _priceController.dispose();
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _change(DraftDilemma value) {
+    widget.onChanged(value);
+    if (_showErrors) setState(() {});
+  }
+
+  void _review() {
+    if (!widget.draft.isValid) {
+      setState(() => _showErrors = true);
+      return;
+    }
+    widget.onReview();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final errors = _showErrors
+        ? widget.draft.validationErrors
+        : const <DraftField, String>{};
+    return BibPageShell(
+      topBar: BibTopBar(title: 'Nova tentação', onBack: widget.onBack),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          BibDraftBanner(recovered: widget.recovered),
+          const SizedBox(height: BibSpacing.x5),
+          BibTextField(
+            controller: _itemController,
+            label: 'Nome do item',
+            helper: 'De 2 a 80 caracteres',
+            maxLength: 80,
+            error: errors[DraftField.itemName],
+            onChanged: (value) =>
+                _change(widget.draft.copyWith(itemName: value)),
+          ),
+          const SizedBox(height: BibSpacing.x4),
+          BibCurrencyField(
+            controller: _priceController,
+            error: errors[DraftField.price],
+            onCentsChanged: (value) =>
+                _change(widget.draft.copyWith(priceCents: value)),
+          ),
+          const SizedBox(height: BibSpacing.x4),
+          BibSelectField<ItemCategory>(
+            label: 'Categoria',
+            value: widget.draft.category,
+            items: {
+              for (final value in ItemCategory.values) value: value.label,
+            },
+            onChanged: (value) {
+              if (value != null) {
+                _change(widget.draft.copyWith(category: value));
+              }
+            },
+          ),
+          const SizedBox(height: BibSpacing.x5),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: BibColors.surfaceSubtle,
+              borderRadius: BorderRadius.circular(BibRadii.hero),
             ),
-            const SizedBox(height: 12),
-            const Text(
-              'Demonstração interna — este conteúdo não tem validade jurídica e não habilita beta.',
-            ),
-            TextField(
-              controller: name,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                labelText: 'Como seus amigos chamam você?',
+            child: Padding(
+              padding: const EdgeInsets.all(BibSpacing.x4),
+              child: BibTextField(
+                controller: _reasonController,
+                label: 'Por que você está pensando nisso agora?',
+                helper:
+                    'O que você espera que isso mude, substitua ou torne possível?',
+                maxLength: 500,
+                maxLines: 5,
+                error: errors[DraftField.reason],
+                onChanged: (value) =>
+                    _change(widget.draft.copyWith(reason: value)),
               ),
             ),
-            CheckboxListTile(
-              value: adult,
-              onChanged: (v) => setState(() => adult = v ?? false),
-              title: const Text('Confirmo que tenho 18 anos ou mais'),
-            ),
-            CheckboxListTile(
-              value: terms,
-              onChanged: (v) => setState(() => terms = v ?? false),
-              title: const Text('Termos de demonstração (Lorem ipsum)'),
-            ),
-            CheckboxListTile(
-              value: privacy,
-              onChanged: (v) => setState(() => privacy = v ?? false),
-              title: const Text(
-                'Aviso de privacidade de demonstração (Lorem ipsum)',
-              ),
-            ),
-            SizedBox(
-              height: 52,
-              child: FilledButton(
-                onPressed: ready ? widget.onDone : null,
-                child: const Text('Continuar'),
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: BibSpacing.x5),
+          BibSegmentedChoice<DraftPurpose>(
+            label: 'É para quem?',
+            options: {
+              for (final purpose in DraftPurpose.values) purpose: purpose.label,
+            },
+            selected: widget.draft.purpose,
+            onChanged: (value) =>
+                _change(widget.draft.copyWith(purpose: value)),
+          ),
+          const SizedBox(height: BibSpacing.x5),
+          BibSegmentedChoice<int>(
+            label: 'Quanto espaço você quer antes de decidir?',
+            options: const {24: '24 horas', 72: '3 dias', 168: '7 dias'},
+            selected: widget.draft.pauseHours,
+            onChanged: (value) =>
+                _change(widget.draft.copyWith(pauseHours: value)),
+          ),
+          const SizedBox(height: BibSpacing.x5),
+          const BibPrivacyNotice(
+            title: 'Salvo neste aparelho',
+            body:
+                'Revisar organiza o conteúdo, mas não publica nem compartilha nada.',
+          ),
+          const SizedBox(height: BibSpacing.x6),
+          BibPrimaryButton(label: 'Revisar', onPressed: _review),
+        ],
       ),
     );
   }
 }
 
-class _Home extends StatelessWidget {
-  const _Home({required this.onCreate});
-  final VoidCallback onCreate;
-  @override
-  Widget build(BuildContext c) => Scaffold(
-    body: _Shell(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Spacer(),
-          Text(
-            'Um pouco de espaço antes de decidir',
-            style: Theme.of(c).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Organize a vontade, peça perspectiva a pessoas próximas e escolha no seu tempo.',
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Conte o que está pensando\nOuça perspectivas\nDecida você',
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: onCreate,
-              child: const Text('Criar minha primeira tentação'),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _Draft extends StatelessWidget {
-  const _Draft({
+class ReviewScreen extends StatelessWidget {
+  const ReviewScreen({
+    super.key,
     required this.draft,
-    required this.onChanged,
-    required this.onReview,
+    required this.recovered,
+    required this.onEdit,
   });
-  final DraftDilemma draft;
-  final ValueChanged<DraftDilemma> onChanged;
-  final VoidCallback onReview;
-  @override
-  Widget build(BuildContext c) => Scaffold(
-    appBar: AppBar(title: const Text('Nova tentação')),
-    body: _Shell(
-      child: ListView(
-        children: [
-          Card(
-            child: const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Rascunho — não compartilhado'),
-            ),
-          ),
-          TextField(
-            controller: TextEditingController(text: draft.itemName),
-            onChanged: (v) => onChanged(draft.copyWith(itemName: v)),
-            decoration: const InputDecoration(
-              labelText: 'Nome do item',
-              helperText: 'De 2 a 80 caracteres',
-            ),
-          ),
-          TextField(
-            controller: TextEditingController(
-              text: draft.priceCents == 0 ? '' : draft.priceCents.toString(),
-            ),
-            keyboardType: TextInputType.number,
-            onChanged: (v) =>
-                onChanged(draft.copyWith(priceCents: brlToCents(v))),
-            decoration: const InputDecoration(
-              labelText: 'Preço',
-              prefixText: 'R\$ ',
-            ),
-          ),
-          TextField(
-            controller: TextEditingController(text: draft.reason),
-            maxLines: 4,
-            onChanged: (v) => onChanged(draft.copyWith(reason: v)),
-            decoration: const InputDecoration(
-              labelText: 'Por que você está pensando nisso agora?',
-              helperText: 'De 10 a 500 caracteres',
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 52,
-            child: FilledButton(
-              onPressed: draft.valid ? onReview : null,
-              child: const Text('Revisar'),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
 
-class _Review extends StatelessWidget {
-  const _Review({required this.draft, required this.onEdit});
   final DraftDilemma draft;
+  final bool recovered;
   final VoidCallback onEdit;
+
   @override
-  Widget build(BuildContext c) => Scaffold(
-    appBar: AppBar(title: const Text('Revisar')),
-    body: _Shell(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Tudo certo para pedir uma perspectiva?',
-            style: Theme.of(c).textTheme.headlineMedium,
-          ),
-          const Text('Confira com calma. Nada foi compartilhado ainda.'),
-          const SizedBox(height: 20),
-          Text(draft.itemName, style: Theme.of(c).textTheme.titleLarge),
-          Text(centsToBrl(draft.priceCents)),
-          Text(draft.reason),
-          const Spacer(),
-          OutlinedButton(onPressed: onEdit, child: const Text('Editar')),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: null,
-              child: const Text('Publicação disponível na próxima etapa'),
-            ),
-          ),
-        ],
-      ),
+  Widget build(BuildContext context) => BibPageShell(
+    topBar: BibTopBar(title: 'Revisar', onBack: onEdit),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Tudo certo para pedir uma perspectiva?',
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
+        const SizedBox(height: BibSpacing.x3),
+        const Text('Confira com calma. Nada foi compartilhado ainda.'),
+        const SizedBox(height: BibSpacing.x5),
+        BibDraftBanner(recovered: recovered),
+        const SizedBox(height: BibSpacing.x6),
+        BibDilemmaSummary(draft: draft),
+        const SizedBox(height: BibSpacing.x6),
+        const BibPrivacyNotice(
+          title: 'Continua privado',
+          body:
+              'Prévia, publicação e compartilhamento serão habilitados somente em uma próxima etapa.',
+        ),
+        const SizedBox(height: BibSpacing.x5),
+        Align(
+          alignment: Alignment.center,
+          child: BibTextButton(label: 'Editar', onPressed: onEdit),
+        ),
+        const SizedBox(height: BibSpacing.x2),
+        const BibPrimaryButton(
+          label: 'Publicação disponível na próxima etapa',
+          onPressed: null,
+        ),
+      ],
     ),
   );
 }
