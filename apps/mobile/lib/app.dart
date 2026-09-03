@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -7,7 +8,7 @@ import 'core/app_config.dart';
 import 'design_system/bib_components.dart';
 import 'design_system/bib_theme.dart';
 import 'features/auth/auth_gateway.dart';
-import 'features/auth/magic_link_screen.dart';
+import 'features/auth/google_sign_in_screen.dart';
 import 'features/creator/creator_flow.dart';
 import 'features/creator/draft.dart';
 import 'features/creator/draft_repository.dart';
@@ -22,16 +23,19 @@ class BeforeIBuyApp extends StatelessWidget {
     OnboardingRepository? onboardingRepository,
     DraftRepository? draftRepository,
     String Function()? createId,
+    TargetPlatform? platform,
   }) : onboardingRepository =
            onboardingRepository ?? SharedPreferencesOnboardingRepository(),
        draftRepository = draftRepository ?? SharedPreferencesDraftRepository(),
-       createId = createId ?? const Uuid().v4;
+       createId = createId ?? const Uuid().v4,
+       platform = platform ?? defaultTargetPlatform;
 
   final AppConfig config;
   final AuthGateway? authGateway;
   final OnboardingRepository onboardingRepository;
   final DraftRepository draftRepository;
   final String Function() createId;
+  final TargetPlatform platform;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -44,6 +48,7 @@ class BeforeIBuyApp extends StatelessWidget {
       onboardingRepository: onboardingRepository,
       draftRepository: draftRepository,
       createId: createId,
+      platform: platform,
     ),
   );
 }
@@ -51,8 +56,7 @@ class BeforeIBuyApp extends StatelessWidget {
 enum AppStage {
   configurationMissing,
   loading,
-  magicLink,
-  waitingForLink,
+  googleSignIn,
   onboarding,
   home,
   draft,
@@ -67,6 +71,7 @@ class AppFlow extends StatefulWidget {
     required this.onboardingRepository,
     required this.draftRepository,
     required this.createId,
+    required this.platform,
   });
 
   final AppConfig config;
@@ -74,6 +79,7 @@ class AppFlow extends StatefulWidget {
   final OnboardingRepository onboardingRepository;
   final DraftRepository draftRepository;
   final String Function() createId;
+  final TargetPlatform platform;
 
   @override
   State<AppFlow> createState() => _AppFlowState();
@@ -82,7 +88,6 @@ class AppFlow extends StatefulWidget {
 class _AppFlowState extends State<AppFlow> {
   AppStage _stage = AppStage.loading;
   StreamSubscription<AuthStatus>? _authSubscription;
-  String _waitingEmail = '';
   LocalOnboarding? _onboarding;
   DraftDilemma? _draft;
   bool _recoveredDraft = false;
@@ -94,7 +99,8 @@ class _AppFlowState extends State<AppFlow> {
   }
 
   Future<void> _bootstrap() async {
-    if (!widget.config.hasSupabaseConfiguration || widget.authGateway == null) {
+    if (!widget.config.isReadyFor(widget.platform) ||
+        widget.authGateway == null) {
       if (mounted) setState(() => _stage = AppStage.configurationMissing);
       return;
     }
@@ -102,13 +108,13 @@ class _AppFlowState extends State<AppFlow> {
       if (status == AuthStatus.signedIn) {
         _resolveAuthenticatedState();
       } else if (mounted) {
-        setState(() => _stage = AppStage.magicLink);
+        setState(() => _stage = AppStage.googleSignIn);
       }
     });
     if (widget.authGateway!.isAuthenticated) {
       await _resolveAuthenticatedState();
     } else if (mounted) {
-      setState(() => _stage = AppStage.magicLink);
+      setState(() => _stage = AppStage.googleSignIn);
     }
   }
 
@@ -161,19 +167,12 @@ class _AppFlowState extends State<AppFlow> {
 
   @override
   Widget build(BuildContext context) => switch (_stage) {
-    AppStage.configurationMissing => const ConfigurationMissingScreen(),
-    AppStage.loading => const _LoadingScreen(),
-    AppStage.magicLink => MagicLinkScreen(
-      authGateway: widget.authGateway!,
-      onLinkSent: (email) => setState(() {
-        _waitingEmail = email;
-        _stage = AppStage.waitingForLink;
-      }),
+    AppStage.configurationMissing => ConfigurationMissingScreen(
+      missing: widget.config.missingFor(widget.platform),
     ),
-    AppStage.waitingForLink => WaitingForMagicLinkScreen(
-      email: _waitingEmail,
+    AppStage.loading => const _LoadingScreen(),
+    AppStage.googleSignIn => GoogleSignInScreen(
       authGateway: widget.authGateway!,
-      onChangeEmail: () => setState(() => _stage = AppStage.magicLink),
     ),
     AppStage.onboarding => OnboardingScreen(
       initialValue: _onboarding,
@@ -196,28 +195,30 @@ class _AppFlowState extends State<AppFlow> {
 }
 
 class ConfigurationMissingScreen extends StatelessWidget {
-  const ConfigurationMissingScreen({super.key});
+  const ConfigurationMissingScreen({super.key, required this.missing});
+
+  final List<String> missing;
 
   @override
-  Widget build(BuildContext context) => const BibPageShell(
+  Widget build(BuildContext context) => BibPageShell(
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.settings_outlined, size: 52),
-        SizedBox(height: BibSpacing.x5),
-        Text(
+        const Icon(Icons.settings_outlined, size: 52),
+        const SizedBox(height: BibSpacing.x5),
+        const Text(
           'Configuração interna ausente',
           style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
         ),
-        SizedBox(height: BibSpacing.x3),
-        Text(
-          'Este build ainda não recebeu a URL e a chave pública do Supabase. Nenhuma conexão foi tentada.',
+        const SizedBox(height: BibSpacing.x3),
+        const Text(
+          'Este build ainda não recebeu toda a configuração pública necessária. Nenhuma conexão foi tentada.',
         ),
-        SizedBox(height: BibSpacing.x5),
+        const SizedBox(height: BibSpacing.x5),
         BibInlineMessage(
           message:
-              'Inicie com SUPABASE_URL e SUPABASE_ANON_KEY via --dart-define. Nunca use service_role no aplicativo.',
+              'Configure: ${missing.join(', ')}. Use --dart-define-from-file=config/local.json e nunca use service_role no aplicativo.',
         ),
       ],
     ),

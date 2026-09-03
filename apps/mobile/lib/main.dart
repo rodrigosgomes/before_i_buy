@@ -12,9 +12,15 @@ Future<void> main() async {
   if (config.hasSupabaseConfiguration) {
     await Supabase.initialize(
       url: config.supabaseUrl,
-      publishableKey: config.supabaseAnonKey,
+      publishableKey: config.supabasePublishableKey,
     );
-    authGateway = SupabaseAuthGateway(Supabase.instance.client.auth);
+    authGateway = SupabaseGoogleAuthGateway(
+      session: SupabaseAuthSessionGateway(Supabase.instance.client.auth),
+      identityProvider: GoogleSignInIdentityProvider(
+        webClientId: config.googleWebClientId,
+        iosClientId: config.googleIosClientId,
+      ),
+    );
   }
   runApp(BeforeIBuyApp(config: config, authGateway: authGateway));
 }

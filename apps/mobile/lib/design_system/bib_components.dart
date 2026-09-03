@@ -224,12 +224,18 @@ class BibSelectField<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<T>(
     initialValue: value,
+    isExpanded: true,
     decoration: InputDecoration(labelText: label),
     items: items.entries
         .map(
-          (entry) =>
-              DropdownMenuItem<T>(value: entry.key, child: Text(entry.value)),
+          (entry) => DropdownMenuItem<T>(
+            value: entry.key,
+            child: Text(entry.value, overflow: TextOverflow.ellipsis),
+          ),
         )
+        .toList(),
+    selectedItemBuilder: (context) => items.values
+        .map((value) => Text(value, overflow: TextOverflow.ellipsis))
         .toList(),
     onChanged: onChanged,
   );

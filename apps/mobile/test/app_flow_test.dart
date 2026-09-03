@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:before_i_buy_mobile/app.dart';
 import 'package:before_i_buy_mobile/core/app_config.dart';
 import 'package:before_i_buy_mobile/features/auth/auth_gateway.dart';
@@ -9,7 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 const configured = AppConfig(
   supabaseUrl: 'https://example.supabase.co',
-  supabaseAnonKey: 'public-key',
+  supabasePublishableKey: 'public-key',
+  googleWebClientId: 'web.apps.googleusercontent.com',
+  googleIosClientId: 'ios.apps.googleusercontent.com',
 );
 const uuid = '123e4567-e89b-42d3-a456-426614174000';
 const completeOnboarding = LocalOnboarding(
@@ -24,12 +28,14 @@ BeforeIBuyApp testApp({
   MemoryOnboardingRepository? onboarding,
   MemoryDraftRepository? drafts,
   AppConfig config = configured,
+  TargetPlatform platform = TargetPlatform.android,
 }) => BeforeIBuyApp(
   config: config,
   authGateway: auth,
   onboardingRepository: onboarding ?? MemoryOnboardingRepository(),
   draftRepository: drafts ?? MemoryDraftRepository(),
   createId: () => uuid,
+  platform: platform,
 );
 
 Future<void> tapVisible(WidgetTester tester, Finder finder) async {
@@ -46,52 +52,47 @@ void main() {
     await tester.pumpWidget(
       testApp(
         auth: auth,
-        config: const AppConfig(supabaseUrl: '', supabaseAnonKey: ''),
+        config: const AppConfig(
+          supabaseUrl: '',
+          supabasePublishableKey: '',
+          googleWebClientId: '',
+          googleIosClientId: '',
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Configuração interna ausente'), findsOneWidget);
     expect(find.textContaining('Nenhuma conexão foi tentada'), findsOneWidget);
-    expect(auth.sendCount, 0);
+    expect(find.textContaining('GOOGLE_WEB_CLIENT_ID'), findsOneWidget);
+    expect(auth.googleSignInCount, 0);
   });
 
-  testWidgets('magic link validates, handles failure, and waits for callback', (
+  testWidgets('Google cancellation is neutral and failures are generic', (
     tester,
   ) async {
-    final auth = FakeAuthGateway();
+    final auth = FakeAuthGateway(nextGoogleResult: SocialAuthResult.cancelled);
     await tester.pumpWidget(testApp(auth: auth));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'email-invalido');
-    await tester.tap(find.text('Receber link de entrada'));
-    await tester.pump();
-    expect(find.text('Informe um e-mail válido.'), findsOneWidget);
-
-    auth.failure = StateError('offline');
-    await tester.enterText(find.byType(TextField), 'lu@example.com');
-    await tester.tap(find.text('Receber link de entrada'));
+    await tester.tap(find.text('Continuar com Google'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Não foi possível enviar'), findsOneWidget);
+    expect(find.textContaining('Entrada cancelada'), findsOneWidget);
+    expect(auth.googleSignInCount, 1);
 
-    auth.failure = null;
-    await tester.tap(find.text('Receber link de entrada'));
+    auth.nextGoogleResult = SocialAuthResult.failed;
+    await tester.tap(find.text('Continuar com Google'));
     await tester.pumpAndSettle();
-    expect(find.text('Confira seu e-mail'), findsOneWidget);
-    expect(auth.lastEmail, 'lu@example.com');
-    expect(auth.lastRedirectTo, 'beforeibuy://auth-callback');
-
-    await tester.tap(find.text('Reenviar link'));
-    await tester.pumpAndSettle();
-    expect(find.text('Um novo link foi enviado.'), findsOneWidget);
-    expect(auth.sendCount, 3);
-
-    await tester.tap(find.text('Usar outro e-mail'));
-    await tester.pumpAndSettle();
-    expect(find.text('Receber link de entrada'), findsOneWidget);
+    expect(
+      find.textContaining('Não foi possível entrar agora'),
+      findsOneWidget,
+    );
+    expect(auth.googleSignInCount, 2);
   });
 
-  testWidgets('fake Auth completes the entire offline 3A flow', (tester) async {
+  testWidgets('fake Google Auth completes the entire offline 3A flow', (
+    tester,
+  ) async {
     final auth = FakeAuthGateway();
     final onboarding = MemoryOnboardingRepository();
     final drafts = MemoryDraftRepository();
@@ -100,12 +101,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'lu@example.com');
-    await tester.tap(find.text('Receber link de entrada'));
+    await tester.tap(find.text('Continuar com Google'));
     await tester.pumpAndSettle();
-    auth.completeSignIn();
-    await tester.pumpAndSettle();
-
     expect(
       find.text('Antes de continuar, vamos deixar tudo claro'),
       findsOneWidget,
@@ -143,20 +140,39 @@ void main() {
     expect(drafts.value?.idempotencyKey, uuid);
     expect(drafts.value?.purpose, DraftPurpose.gift);
     expect(drafts.value?.pauseHours, 168);
-    expect(auth.sendCount, 1);
+    expect(auth.googleSignInCount, 1);
 
     await tapVisible(tester, find.text('Editar'));
     expect(find.text('Fone com cancelamento de ruído'), findsOneWidget);
   });
 
+  testWidgets('Google entry blocks duplicate taps while authenticating', (
+    tester,
+  ) async {
+    final auth = _DelayedAuthGateway();
+    await tester.pumpWidget(testApp(auth: auth));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Continuar com Google'));
+    await tester.tap(find.text('Continuar com Google'));
+    await tester.pump();
+    expect(auth.googleSignInCount, 1);
+
+    auth.complete();
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Antes de continuar, vamos deixar tudo claro'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('invalid form announces errors without losing content', (
     tester,
   ) async {
-    final auth = FakeAuthGateway(authenticated: true);
     final drafts = MemoryDraftRepository();
     await tester.pumpWidget(
       testApp(
-        auth: auth,
+        auth: FakeAuthGateway(authenticated: true),
         onboarding: MemoryOnboardingRepository(completeOnboarding),
         drafts: drafts,
       ),
@@ -196,6 +212,27 @@ void main() {
     expect(drafts.value?.idempotencyKey, uuid);
   });
 
+  testWidgets('iOS configuration names its missing public identifier', (
+    tester,
+  ) async {
+    const withoutIosClient = AppConfig(
+      supabaseUrl: 'https://example.supabase.co',
+      supabasePublishableKey: 'public-key',
+      googleWebClientId: 'web.apps.googleusercontent.com',
+      googleIosClientId: '',
+    );
+    await tester.pumpWidget(
+      testApp(
+        auth: FakeAuthGateway(),
+        config: withoutIosClient,
+        platform: TargetPlatform.iOS,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('GOOGLE_IOS_CLIENT_ID'), findsOneWidget);
+  });
+
   testWidgets('draft reflows at 320px and 200 percent text', (tester) async {
     tester.view.physicalSize = const Size(320, 800);
     tester.view.devicePixelRatio = 1;
@@ -218,10 +255,25 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Rascunho — não compartilhado'), findsOneWidget);
-    await tester.scrollUntilVisible(
+    expect(
       find.text('Quanto espaço você quer antes de decidir?'),
-      300,
+      findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });
+}
+
+class _DelayedAuthGateway extends FakeAuthGateway {
+  final _completer = Completer<SocialAuthResult>();
+
+  @override
+  Future<SocialAuthResult> signInWithGoogle() {
+    googleSignInCount += 1;
+    return _completer.future;
+  }
+
+  void complete() {
+    completeSignIn();
+    _completer.complete(SocialAuthResult.authenticated);
+  }
 }

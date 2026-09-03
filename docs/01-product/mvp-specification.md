@@ -59,7 +59,9 @@ The MVP is successful only if users create, friends vote, owners resolve, owners
 ### FR-01 Account and eligibility
 
 - Owner confirms they are an adult and accepts Terms and Privacy Notice.
-- Sign-in uses email magic link or Apple/Google where available.
+- Sign-in uses Google native on Android and iOS in development. Apple Sign In
+  is required before iOS App Store submission; password and magic link are not
+  part of this MVP flow.
 - A guest can vote without account creation.
 - Age policy and legal wording must receive counsel review before public release.
 

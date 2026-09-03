@@ -1,6 +1,6 @@
 # Task 3 — mobile do criador: rascunho, revisão, publicação e compartilhamento
 
-**Status:** planejada; magic link aceito, aguardando implementação e configuração de ambiente  
+**Status:** planejada; pré-requisito de entrada Google nativa entregue na Task 3A, publicação e compartilhamento aguardam Task 3B
 **Tipo:** vertical slice mobile, privacidade e integração  
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)  
 **Depende de:** [Task 2 — web de convidado](T2-guest-web-same-origin-voting.md)
@@ -24,12 +24,12 @@ de Privacidade. Não há, no repositório, cliente mobile, fluxo de autenticaç�
 versões de consentimento aprovadas ou ambiente Supabase que o aplicativo possa
 usar.
 
-A [DEC-013](../DECISION_LOG.md#dec-013-autenticação-do-criador-por-magic-link-de-e-mail)
-aceitou magic link de e-mail para o criador. A implementação usa somente URL e
-chave pública Supabase por `--dart-define`; SMTP, redirect URL e versões/cópia
-jurídica são configuração de ambiente e continuam fora desta task. A criação do
-rascunho local não depende de rede; simular autenticação ou gravar uma chave de
-serviço no app é proibido.
+A [DEC-014](../DECISION_LOG.md#dec-014-autenticação-nativa-do-criador-por-google)
+adotou Google Sign-In nativo para o criador. A implementação usa URL, chave
+publicável Supabase e Client IDs públicos por `--dart-define`; Client Secret,
+versões/cópia jurídica e Apple Sign In são configuração ou entregas separadas.
+A criação do rascunho local não depende de rede; simular autenticação ou gravar
+uma chave de serviço no app é proibido.
 
 ## 3. Escopo após o pré-requisito
 

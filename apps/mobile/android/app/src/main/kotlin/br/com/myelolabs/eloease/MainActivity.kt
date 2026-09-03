@@ -1,4 +1,4 @@
-package com.beforeibuy.mobile
+package br.com.myelolabs.eloease
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -160,8 +160,31 @@ Cada entrada segue o padrão:
 
 ### DEC-013: Autenticação do Criador por Magic Link de E-mail
 - **Data:** 2026-09-01
-- **Status:** `Aceito`
+- **Status:** `Substituído por DEC-014`
 - **Contexto:** A publicação privada exige autoria recuperável e um perfil com confirmação de maioridade e consentimentos. Senha, SMS e provedores sociais acrescentariam recuperação, custo, dados ou integrações que não ajudam a validar a Entrega 1.
 - **Decisão:** O criador entra por magic link de e-mail via Supabase Auth. O e-mail serve somente à autenticação; não entra em perfil público, analytics, convites, voto ou comunicação de convidado. Após a primeira sessão, o app exige nome de exibição, autoafirmação +18 e aceite separado de Termos/Aviso antes de permitir a publicação. O cliente recebe apenas URL e chave pública por configuração de ambiente; `service_role` permanece exclusiva do backend.
 - **Consequências:** O fluxo evita senha e mantém a identidade do criador recuperável, mas requer configuração segura de redirecionamento e envio de e-mail em cada ambiente. A cópia, versão e base legal de Termos/Aviso continuam bloqueadores de beta externo; builds internos usam configuração explicitamente marcada como não-beta.
 - **Gatilho de Revisão:** Baixa conversão de entrada, custo/entregabilidade de e-mail ou necessidade comprovada de login social.
+
+---
+
+### DEC-014: Autenticação Nativa do Criador por Google
+- **Data:** 2026-09-03
+- **Status:** `Aceito`
+- **Contexto:** O callback do magic link retornava ao `localhost` sem um
+  consumidor disponível, adicionando uma dependência de redirecionamento e
+  fricção sem ajudar o loop da Entrega 1.
+- **Decisão:** O criador entra por Google Sign-In nativo em Android e iOS. O
+  app obtém ID/access tokens pelo SDK do Google e os entrega ao Supabase Auth;
+  não há callback web, magic link ou senha. O identificador Android/iOS é
+  `br.com.myelolabs.eloease`. Apple Sign In fica em task posterior, obrigatória
+  antes de qualquer envio à App Store.
+- **Consequências:** Google Cloud e Supabase Auth precisam de clientes Web,
+  Android e iOS, todos de desenvolvimento inicialmente. Client Secret fica
+  somente em Google Cloud/Supabase; o app recebe URL, chave publicável e Client
+  IDs públicos por configuração local. Nome e e-mail do Google não aparecem em
+  convites, analytics ou perfil público. Sem páginas jurídicas reais, o OAuth
+  permanece em modo Testing e não habilita beta público.
+- **Gatilho de Revisão:** Baixa conversão, erro de compatibilidade nativa ou a
+  preparação da primeira submissão iOS, quando Apple Sign In e exclusão de
+  conta passam a ser requisitos de liberação.

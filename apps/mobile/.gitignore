@@ -46,3 +46,4 @@ app.*.map.json
 
 # Local compile-time configuration; copy config/local.example.json to this path.
 /config/local.json
+/ios/Flutter/GoogleSignIn.xcconfig

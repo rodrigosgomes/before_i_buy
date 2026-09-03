@@ -1,39 +1,69 @@
 import 'package:before_i_buy_mobile/core/app_config.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-void main() {
-  group('AppConfig', () {
-    test('accepts HTTPS and local Supabase URLs with a public key', () {
-      expect(
-        const AppConfig(
-          supabaseUrl: 'https://project.supabase.co',
-          supabaseAnonKey: 'public-key',
-        ).hasSupabaseConfiguration,
-        isTrue,
-      );
-      expect(
-        const AppConfig(
-          supabaseUrl: 'http://127.0.0.1:54321',
-          supabaseAnonKey: 'public-key',
-        ).hasSupabaseConfiguration,
-        isTrue,
-      );
-    });
+const readyConfig = AppConfig(
+  supabaseUrl: 'https://example.supabase.co',
+  supabasePublishableKey: 'public-key',
+  googleWebClientId: 'web.apps.googleusercontent.com',
+  googleIosClientId: 'ios.apps.googleusercontent.com',
+);
 
-    test('rejects missing, malformed, and insecure remote configuration', () {
-      for (final config in [
-        const AppConfig(supabaseUrl: '', supabaseAnonKey: ''),
-        const AppConfig(
-          supabaseUrl: 'not-a-url',
-          supabaseAnonKey: 'public-key',
-        ),
-        const AppConfig(
-          supabaseUrl: 'http://example.com',
-          supabaseAnonKey: 'public-key',
-        ),
-      ]) {
-        expect(config.hasSupabaseConfiguration, isFalse);
-      }
-    });
+void main() {
+  test('accepts HTTPS Supabase configuration', () {
+    expect(readyConfig.hasSupabaseConfiguration, isTrue);
+    expect(readyConfig.isReadyFor(TargetPlatform.android), isTrue);
+    expect(readyConfig.isReadyFor(TargetPlatform.iOS), isTrue);
+  });
+
+  test('allows localhost only over HTTP for local development', () {
+    const config = AppConfig(
+      supabaseUrl: 'http://localhost:54321',
+      supabasePublishableKey: 'public-key',
+      googleWebClientId: 'web.apps.googleusercontent.com',
+      googleIosClientId: 'ios.apps.googleusercontent.com',
+    );
+
+    expect(config.hasSupabaseConfiguration, isTrue);
+  });
+
+  test('fails closed for malformed Supabase configuration', () {
+    const config = AppConfig(
+      supabaseUrl: 'http://untrusted.example',
+      supabasePublishableKey: '',
+      googleWebClientId: '',
+      googleIosClientId: '',
+    );
+
+    expect(config.hasSupabaseConfiguration, isFalse);
+    expect(
+      config.missingFor(TargetPlatform.android),
+      containsAll(<String>[
+        'SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY',
+        'GOOGLE_WEB_CLIENT_ID',
+      ]),
+    );
+  });
+
+  test('requires an iOS client ID only on iOS', () {
+    const config = AppConfig(
+      supabaseUrl: 'https://example.supabase.co',
+      supabasePublishableKey: 'public-key',
+      googleWebClientId: 'web.apps.googleusercontent.com',
+      googleIosClientId: '',
+    );
+
+    expect(config.isReadyFor(TargetPlatform.android), isTrue);
+    expect(
+      config.missingFor(TargetPlatform.iOS),
+      contains('GOOGLE_IOS_CLIENT_ID'),
+    );
+  });
+
+  test('fails closed outside the supported mobile platforms', () {
+    expect(
+      readyConfig.missingFor(TargetPlatform.macOS),
+      contains('Google nativo requer Android ou iOS'),
+    );
   });
 }

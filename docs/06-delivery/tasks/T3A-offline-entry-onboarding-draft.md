@@ -2,15 +2,15 @@
 
 **Status:** em implementação interna
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)
-**Decisão:** [DEC-013](../DECISION_LOG.md#dec-013-autenticação-do-criador-por-magic-link-de-e-mail)
+**Decisão:** [DEC-014](../DECISION_LOG.md#dec-014-autenticação-nativa-do-criador-por-google)
 
 ## Resultado e limites
 
-Entregar, sem ambiente remoto, o fluxo
-`configuração ausente → magic link → aguardando link → onboarding → home → rascunho → revisão`.
-O rascunho e o onboarding permanecem locais. SMTP, configuração externa do
-callback, perfil remoto, prévia E1-S04, publicação, convite, compartilhamento,
-analytics e IA não pertencem a esta task.
+Entregar, com Supabase remoto de desenvolvimento, o fluxo
+`configuração ausente → entrada Google → autenticando → onboarding → home → rascunho → revisão`.
+O rascunho e o onboarding permanecem locais. Apple Sign In, perfil remoto,
+prévia E1-S04, publicação, convite, compartilhamento, analytics e IA não
+pertencem a esta task.
 
 ## Subtasks e critérios
 
@@ -19,8 +19,10 @@ analytics e IA não pertencem a esta task.
 - Tokens Playful Calm e componentes `Bib*` são a única API visual das telas.
 - Auth passa por gateway injetável; produção usa somente URL e chave pública.
 - Sem configuração, nenhuma instância Supabase ou tentativa de rede é criada.
-- Envio usa `beforeibuy://auth-callback` e possui estados de erro, loading,
-  aguardando link, reenvio e troca de e-mail.
+- Google nativo usa ID/access tokens, sem callback de navegador, magic link ou
+  senha; cancelamento, loading e erro são estados explícitos.
+- A configuração exige URL/chave publicável Supabase e Client IDs Google; Client
+  Secret nunca entra no app ou no Git.
 
 ### 3A.2 — estado local e E1-S01 a E1-S03
 
@@ -39,7 +41,7 @@ analytics e IA não pertencem a esta task.
 
 ## Interfaces e dados
 
-- `AuthGateway`: sessão atual, eventos e `signInWithOtp`.
+- `AuthGateway`: sessão atual, eventos e `signInWithGoogle`.
 - `OnboardingRepository`: leitura e gravação do fixture interno local.
 - `DraftRepository`: leitura e gravação de um único `DraftDilemma`.
 - `DraftDilemma`: schema local v1, item, centavos BRL, categoria, motivo,
@@ -49,5 +51,5 @@ analytics e IA não pertencem a esta task.
 
 Não há migration, alteração de RLS ou contrato remoto. O rollback é remover a
 vertical slice mobile sem tocar no backend ou Web. Os testes devem provar que
-login, callback, reabertura, reconexão e revisão não possuem caminho para a RPC
+login, reabertura, reconexão e revisão não possuem caminho para a RPC
 `publish_dilemma`.
