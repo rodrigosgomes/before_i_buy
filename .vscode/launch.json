@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Guest Web: Next.js",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev -- --port 3100",
+      "cwd": "${workspaceFolder}/apps/guest-web"
+    },
+    {
+      "name": "Guest Web: Browser",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3100",
+      "webRoot": "${workspaceFolder}/apps/guest-web"
+    },
+    {
+      "name": "Mobile: Flutter",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/apps/mobile",
+      "toolArgs": [
+        "--dart-define-from-file=${workspaceFolder}/apps/mobile/config/local.json"
+      ]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Guest Web: Run and Debug",
+      "configurations": [
+        "Guest Web: Next.js",
+        "Guest Web: Browser"
+      ],
+      "stopAll": true
+    }
+  ]
+}

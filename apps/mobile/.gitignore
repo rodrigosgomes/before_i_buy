@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local compile-time configuration; copy config/local.example.json to this path.
+/config/local.json
