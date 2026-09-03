@@ -22,7 +22,9 @@ Supabase. Não o coloque em `local.json`, Xcode, GitHub Actions ou logs.
 ## 2. Supabase
 
 1. No projeto de desenvolvimento, ative Google em Authentication > Providers.
-2. Informe Web Client ID e Client Secret.
+2. Informe somente o Web Client ID e o Client Secret correspondente. Android e
+   iOS são configurados no SDK nativo; o Secret fica exclusivamente no
+   dashboard do Supabase.
 3. Para Google nativo no iOS, habilite **Skip nonce check** conforme a
    orientação do SDK Supabase.
 4. Mantenha magic link desativado para este fluxo e não configure redirects

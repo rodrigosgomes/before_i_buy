@@ -9,6 +9,14 @@ void main() {
     accessToken: 'access-token',
   );
 
+  test('limits Google authorization to authentication scopes', () {
+    expect(googleAuthenticationScopes, const <String>[
+      'openid',
+      'email',
+      'profile',
+    ]);
+  });
+
   test('exchanges native Google tokens for a Supabase session', () async {
     final session = _MemorySession();
     final gateway = SupabaseGoogleAuthGateway(

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+const googleAuthenticationScopes = <String>['openid', 'email', 'profile'];
+
 enum AuthStatus { signedOut, signedIn }
 
 enum SocialAuthResult { authenticated, cancelled, failed }
@@ -58,8 +60,12 @@ class GoogleSignInIdentityProvider implements GoogleIdentityProvider {
     try {
       final account = await GoogleSignIn.instance.authenticate();
       final authorization =
-          await account.authorizationClient.authorizationForScopes([]) ??
-          await account.authorizationClient.authorizeScopes([]);
+          await account.authorizationClient.authorizationForScopes(
+            googleAuthenticationScopes,
+          ) ??
+          await account.authorizationClient.authorizeScopes(
+            googleAuthenticationScopes,
+          );
       final idToken = account.authentication.idToken;
       if (idToken == null || authorization.accessToken.isEmpty) {
         throw const GoogleIdentityTokenException();
