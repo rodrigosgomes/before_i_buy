@@ -25,6 +25,8 @@ void main() {
     final restored = await SharedPreferencesDraftRepository().load();
     expect(restored?.toJson(), draft.toJson());
     expect(restored?.idempotencyKey, uuid);
+    await repository.clear();
+    expect(await SharedPreferencesDraftRepository().load(), isNull);
   });
 
   test('draft repository fails closed for corrupt local data', () async {
@@ -66,8 +68,26 @@ void main() {
       ).isComplete,
       isFalse,
     );
+    expect(
+      LocalOnboarding(
+        displayName: 'a' * 51,
+        adultConfirmed: true,
+        termsAccepted: true,
+        privacyAccepted: true,
+      ).isComplete,
+      isFalse,
+    );
     expect(LocalOnboarding.fromJson(null), isNull);
     expect(LocalOnboarding.fromJson({'schema_version': 1}), isNull);
+    expect(
+      const LocalOnboarding(
+        displayName: 'X',
+        adultConfirmed: true,
+        termsAccepted: true,
+        privacyAccepted: true,
+      ).isComplete,
+      isFalse,
+    );
   });
 
   test('memory repositories expose saves for integration assertions', () async {

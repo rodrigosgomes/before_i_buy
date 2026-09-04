@@ -417,6 +417,90 @@ class BibDilemmaSummary extends StatelessWidget {
   );
 }
 
+class BibGuestPreviewFrame extends StatelessWidget {
+  const BibGuestPreviewFrame({super.key, required this.draft});
+
+  final DraftDilemma draft;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    label: 'Prévia inerte do convite para convidados',
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: BibColors.surface,
+        border: Border.all(color: BibColors.outline),
+        borderRadius: BorderRadius.circular(BibRadii.card),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(BibSpacing.x4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const BibInlineMessage(
+              message: 'Prévia — nenhuma ação será enviada.',
+              kind: BibMessageKind.info,
+            ),
+            const SizedBox(height: BibSpacing.x4),
+            Text(
+              'Um amigo pediu sua perspectiva',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: BibSpacing.x3),
+            BibDilemmaSummary(draft: draft),
+            const SizedBox(height: BibSpacing.x4),
+            const Text('Como você imagina que essa escolha vai se sentir?'),
+            const SizedBox(height: BibSpacing.x2),
+            const _PreviewVoteOption(
+              label: 'Comprar — provavelmente vai ficar feliz',
+            ),
+            const SizedBox(height: BibSpacing.x2),
+            const _PreviewVoteOption(label: 'Esperar — ainda é cedo'),
+            const SizedBox(height: BibSpacing.x2),
+            const _PreviewVoteOption(
+              label: 'Deixar pra lá — provavelmente vai ficar feliz',
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _PreviewVoteOption extends StatelessWidget {
+  const _PreviewVoteOption({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    enabled: false,
+    label: '$label, indisponível na prévia',
+    child: SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton(onPressed: null, child: Text(label)),
+    ),
+  );
+}
+
+class BibStatusChip extends StatelessWidget {
+  const BibStatusChip({super.key, required this.label, this.icon});
+
+  final String label;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: label,
+    child: Chip(
+      avatar: Icon(icon ?? Icons.lock_outline_rounded, size: 18),
+      label: Text(label),
+    ),
+  );
+}
+
 class BibConsentChecklist extends StatelessWidget {
   const BibConsentChecklist({
     super.key,

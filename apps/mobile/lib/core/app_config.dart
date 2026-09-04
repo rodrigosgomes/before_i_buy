@@ -6,12 +6,14 @@ class AppConfig {
     required this.supabasePublishableKey,
     required this.googleWebClientId,
     required this.googleIosClientId,
+    this.guestInviteBaseUrl = '',
   });
 
   final String supabaseUrl;
   final String supabasePublishableKey;
   final String googleWebClientId;
   final String googleIosClientId;
+  final String guestInviteBaseUrl;
 
   bool get hasSupabaseConfiguration {
     final uri = Uri.tryParse(supabaseUrl);
@@ -42,10 +44,18 @@ class AppConfig {
 
   bool isReadyFor(TargetPlatform platform) => missingFor(platform).isEmpty;
 
+  Uri? get guestInviteBaseUri {
+    final uri = Uri.tryParse(guestInviteBaseUrl.trim());
+    if (uri == null || uri.scheme != 'https' || !uri.hasAuthority) return null;
+    if (uri.hasQuery || uri.hasFragment || uri.userInfo.isNotEmpty) return null;
+    return uri;
+  }
+
   static const fromEnvironment = AppConfig(
     supabaseUrl: String.fromEnvironment('SUPABASE_URL'),
     supabasePublishableKey: String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY'),
     googleWebClientId: String.fromEnvironment('GOOGLE_WEB_CLIENT_ID'),
     googleIosClientId: String.fromEnvironment('GOOGLE_IOS_CLIENT_ID'),
+    guestInviteBaseUrl: String.fromEnvironment('GUEST_INVITE_BASE_URL'),
   );
 }

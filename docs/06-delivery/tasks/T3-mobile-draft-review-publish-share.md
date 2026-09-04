@@ -1,6 +1,6 @@
 # Task 3 — mobile do criador: rascunho, revisão, publicação e compartilhamento
 
-**Status:** planejada; pré-requisito de entrada Google nativa entregue na Task 3A, publicação e compartilhamento aguardam Task 3B
+**Status:** Task 3B planejada e autorizada para implementação interna; Task 3A concluída
 **Tipo:** vertical slice mobile, privacidade e integração  
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)  
 **Depende de:** [Task 2 — web de convidado](T2-guest-web-same-origin-voting.md)
@@ -39,8 +39,9 @@ uma chave de serviço no app é proibido.
   motivo, finalidade e pausa; recuperar após reinício como **Rascunho — não
   compartilhado**;
 - validar os limites do PRD e exigir revisão e prévia antes de publicar;
-- configurar autenticação do criador e perfil mínimo de consentimento, sem
-  coletar data de nascimento;
+- sincronizar, por RPC autenticada e estreita, o perfil mínimo de
+  desenvolvimento com nome de exibição, maioridade e as versões internas
+  `internal-demo-v1`, sem coletar data de nascimento ou usar metadados Google;
 - chamar somente a RPC autenticada `publish_dilemma` com chave de idempotência;
 - compartilhar o convite por folha nativa, sem exibir token/URL em tela ou logs;
 - testar offline → reinício → revisão → publicação explícita e o contrato de
@@ -52,8 +53,8 @@ uma chave de serviço no app é proibido.
 - imagens, URLs de produto, razão de voto, comentários, notificações, Reveal,
   decisão, pontuação, feed, analytics, publicidade ou IA;
 - revogação, exclusão e painel de agregados; permanecem slices próprias;
-- deploy, projeto Supabase remoto, chave de serviço, publicação em lojas ou
-  envio de e-mail/SMS sem aprovação explícita.
+- deploy público do Web convidado, domínio, beta externo, chave de serviço,
+  publicação em lojas ou envio de e-mail/SMS sem aprovação explícita.
 
 ## 5. Critérios de aceite
 

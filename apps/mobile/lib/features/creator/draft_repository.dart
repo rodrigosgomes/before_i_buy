@@ -7,6 +7,7 @@ import 'draft.dart';
 abstract interface class DraftRepository {
   Future<DraftDilemma?> load();
   Future<void> save(DraftDilemma draft);
+  Future<void> clear();
 }
 
 class SharedPreferencesDraftRepository implements DraftRepository {
@@ -34,6 +35,11 @@ class SharedPreferencesDraftRepository implements DraftRepository {
       jsonEncode(draft.toJson()),
     );
   }
+
+  @override
+  Future<void> clear() async {
+    await (await _preferences).remove(storageKey);
+  }
 }
 
 class MemoryDraftRepository implements DraftRepository {
@@ -49,5 +55,10 @@ class MemoryDraftRepository implements DraftRepository {
   Future<void> save(DraftDilemma draft) async {
     value = draft;
     saveCount += 1;
+  }
+
+  @override
+  Future<void> clear() async {
+    value = null;
   }
 }

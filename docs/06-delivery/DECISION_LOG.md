@@ -188,3 +188,25 @@ Cada entrada segue o padrão:
 - **Gatilho de Revisão:** Baixa conversão, erro de compatibilidade nativa ou a
   preparação da primeira submissão iOS, quando Apple Sign In e exclusão de
   conta passam a ser requisitos de liberação.
+
+---
+
+### DEC-015: Consentimento Interno Versionado para Publicação no Desenvolvimento
+- **Data:** 2026-09-03
+- **Status:** `Aceito`
+- **Contexto:** A Task 3A coleta apenas uma fixture local marcada como interna.
+  A publicação idempotente exige perfil remoto com maioridade e versões de
+  Termos/Aviso, mas ainda não há textos jurídicos aprovados para beta externo.
+- **Decisão:** Exclusivamente no projeto Supabase de desenvolvimento, o perfil
+  do criador poderá registrar as versões `internal-demo-v1` de Termos e Aviso
+  por uma RPC autenticada e estreita. As versões são validadas no servidor,
+  sempre exibidas como conteúdo interno sem validade jurídica e não podem ser
+  escolhidas livremente pelo cliente. O fluxo continua sem analytics e sem
+  usar nome ou e-mail vindos do Google.
+- **Consequências:** Permite validar perfil remoto, publicação privada e
+  convite real no ambiente de desenvolvimento. Não autoriza beta externo,
+  produção, promoção do OAuth, nem substitui revisão jurídica, bases legais,
+  retenção, exclusão de conta ou documentos públicos reais. A promoção futura
+  exige desativar a versão interna e cadastrar versões jurídicas aprovadas.
+- **Gatilho de Revisão:** Antes de qualquer domínio público, deploy do Web
+  convidado para terceiros, beta externo ou envio a lojas.

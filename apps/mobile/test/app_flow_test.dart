@@ -5,6 +5,7 @@ import 'package:before_i_buy_mobile/core/app_config.dart';
 import 'package:before_i_buy_mobile/features/auth/auth_gateway.dart';
 import 'package:before_i_buy_mobile/features/creator/draft.dart';
 import 'package:before_i_buy_mobile/features/creator/draft_repository.dart';
+import 'package:before_i_buy_mobile/features/creator/creator_remote_gateway.dart';
 import 'package:before_i_buy_mobile/features/onboarding/onboarding_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +15,7 @@ const configured = AppConfig(
   supabasePublishableKey: 'public-key',
   googleWebClientId: 'web.apps.googleusercontent.com',
   googleIosClientId: 'ios.apps.googleusercontent.com',
+  guestInviteBaseUrl: 'https://guest.example.com',
 );
 const uuid = '123e4567-e89b-42d3-a456-426614174000';
 const completeOnboarding = LocalOnboarding(
@@ -29,11 +31,17 @@ BeforeIBuyApp testApp({
   MemoryDraftRepository? drafts,
   AppConfig config = configured,
   TargetPlatform platform = TargetPlatform.android,
+  CreatorProfileGateway? profile,
+  DilemmaPublicationGateway? publication,
+  InviteShareGateway? share,
 }) => BeforeIBuyApp(
   config: config,
   authGateway: auth,
   onboardingRepository: onboarding ?? MemoryOnboardingRepository(),
   draftRepository: drafts ?? MemoryDraftRepository(),
+  creatorProfileGateway: profile,
+  publicationGateway: publication,
+  shareGateway: share,
   createId: () => uuid,
   platform: platform,
 );
@@ -90,14 +98,26 @@ void main() {
     expect(auth.googleSignInCount, 2);
   });
 
-  testWidgets('fake Google Auth completes the entire offline 3A flow', (
+  testWidgets('fake Google Auth completes the 3B creator publication flow', (
     tester,
   ) async {
     final auth = FakeAuthGateway();
     final onboarding = MemoryOnboardingRepository();
     final drafts = MemoryDraftRepository();
+    final profile = MemoryCreatorProfileGateway(
+      nextStatus: CreatorProfileStatus.needsSync,
+    );
+    final publication = MemoryDilemmaPublicationGateway();
+    final share = MemoryInviteShareGateway();
     await tester.pumpWidget(
-      testApp(auth: auth, onboarding: onboarding, drafts: drafts),
+      testApp(
+        auth: auth,
+        onboarding: onboarding,
+        drafts: drafts,
+        profile: profile,
+        publication: publication,
+        share: share,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -116,8 +136,12 @@ void main() {
     );
     await tapVisible(tester, find.text('Continuar'));
 
+    expect(find.text('Preparar seu perfil de desenvolvimento'), findsOneWidget);
+    await tapVisible(tester, find.text('Salvar perfil neste ambiente'));
+
     expect(find.text('Um pouco de espaço antes de decidir'), findsOneWidget);
     expect(onboarding.value?.isComplete, isTrue);
+    expect(profile.synced.single.displayName, 'Lu');
     await tapVisible(tester, find.text('Criar minha primeira tentação'));
 
     expect(find.text('Rascunho — não compartilhado'), findsOneWidget);
@@ -136,14 +160,26 @@ void main() {
     expect(find.text('Tudo certo para pedir uma perspectiva?'), findsOneWidget);
     expect(find.text('Fone com cancelamento de ruído'), findsOneWidget);
     expect(find.text('R\$ 2.400,00'), findsOneWidget);
-    expect(find.text('Publicação disponível na próxima etapa'), findsOneWidget);
+    expect(find.text('Ver prévia do convite'), findsOneWidget);
     expect(drafts.value?.idempotencyKey, uuid);
     expect(drafts.value?.purpose, DraftPurpose.gift);
     expect(drafts.value?.pauseHours, 168);
     expect(auth.googleSignInCount, 1);
 
-    await tapVisible(tester, find.text('Editar'));
-    expect(find.text('Fone com cancelamento de ruído'), findsOneWidget);
+    await tapVisible(tester, find.text('Ver prévia do convite'));
+    expect(find.text('Prévia — nenhuma ação será enviada.'), findsOneWidget);
+    await tapVisible(tester, find.text('Publicar convite privado'));
+    expect(
+      find.text('Seu espaço está pronto para receber perspectivas'),
+      findsOneWidget,
+    );
+    expect(publication.published, hasLength(1));
+    expect(drafts.value, isNull);
+
+    await tapVisible(tester, find.text('Compartilhar convite'));
+    expect(share.shared, hasLength(1));
+    expect(share.shared.single.host, 'guest.example.com');
+    expect(share.shared.single.pathSegments.take(1), ['invite']);
   });
 
   testWidgets('Google entry blocks duplicate taps while authenticating', (
@@ -260,6 +296,41 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('publication failure preserves the local draft and UUID', (
+    tester,
+  ) async {
+    final draft = const DraftDilemma(idempotencyKey: uuid).copyWith(
+      itemName: 'Fone',
+      priceCents: 10000,
+      reason: 'Quero usar em viagens longas.',
+    );
+    final drafts = MemoryDraftRepository(draft);
+    final publication = MemoryDilemmaPublicationGateway(
+      error: StateError('offline'),
+    );
+    await tester.pumpWidget(
+      testApp(
+        auth: FakeAuthGateway(authenticated: true),
+        onboarding: MemoryOnboardingRepository(completeOnboarding),
+        drafts: drafts,
+        publication: publication,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text('Revisar'));
+    await tapVisible(tester, find.text('Ver prévia do convite'));
+    await tapVisible(tester, find.text('Publicar convite privado'));
+
+    expect(
+      find.text(
+        'Não foi possível publicar agora. Seu rascunho continua salvo.',
+      ),
+      findsOneWidget,
+    );
+    expect(drafts.value?.idempotencyKey, uuid);
+    expect(publication.published, isEmpty);
   });
 }
 

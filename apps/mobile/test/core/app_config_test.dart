@@ -66,4 +66,33 @@ void main() {
       contains('Google nativo requer Android ou iOS'),
     );
   });
+
+  test('accepts only a clean HTTPS guest invite origin', () {
+    const configured = AppConfig(
+      supabaseUrl: 'https://example.supabase.co',
+      supabasePublishableKey: 'public-key',
+      googleWebClientId: 'web.apps.googleusercontent.com',
+      googleIosClientId: 'ios.apps.googleusercontent.com',
+      guestInviteBaseUrl: 'https://guest.example.com/app',
+    );
+    const invalid = AppConfig(
+      supabaseUrl: 'https://example.supabase.co',
+      supabasePublishableKey: 'public-key',
+      googleWebClientId: 'web.apps.googleusercontent.com',
+      googleIosClientId: 'ios.apps.googleusercontent.com',
+      guestInviteBaseUrl: 'http://guest.example.com?token=not-allowed',
+    );
+
+    expect(configured.guestInviteBaseUri?.path, '/app');
+    expect(invalid.guestInviteBaseUri, isNull);
+
+    const withUserInfo = AppConfig(
+      supabaseUrl: 'https://example.supabase.co',
+      supabasePublishableKey: 'public-key',
+      googleWebClientId: 'web.apps.googleusercontent.com',
+      googleIosClientId: 'ios.apps.googleusercontent.com',
+      guestInviteBaseUrl: 'https://user@guest.example.com',
+    );
+    expect(withUserInfo.guestInviteBaseUri, isNull);
+  });
 }

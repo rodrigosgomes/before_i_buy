@@ -6,7 +6,7 @@ CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path TO extensions, public, auth;
 
-SELECT plan(10);
+SELECT plan(11);
 
 SELECT is(
     (
@@ -16,11 +16,11 @@ SELECT is(
           AND tablename IN (
               'profiles', 'dilemmas', 'owner_expectations', 'participations',
               'votes', 'decisions', 'reflections', 'guest_reveal_subscriptions',
-              'outbox_jobs', 'reports'
+              'outbox_jobs', 'reports', 'creator_consent_versions'
           )
           AND rowsecurity
     ),
-    10,
+    11,
     'Every exposed product table has Row Level Security enabled'
 );
 
@@ -109,6 +109,18 @@ SELECT ok(
         WHERE schemaname = 'public' AND indexname = 'idx_dilemmas_token_hash'
     ),
     'The invite-token hash index exists'
+);
+
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM public.creator_consent_versions
+        WHERE document_kind = 'terms'
+          AND version = 'internal-demo-v1'
+          AND is_active
+          AND is_internal_demo
+    ),
+    'The development-only consent version is explicit and active'
 );
 
 SELECT * FROM finish();

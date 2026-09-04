@@ -239,11 +239,13 @@ class ReviewScreen extends StatelessWidget {
     required this.draft,
     required this.recovered,
     required this.onEdit,
+    required this.onPreview,
   });
 
   final DraftDilemma draft;
   final bool recovered;
   final VoidCallback onEdit;
+  final VoidCallback onPreview;
 
   @override
   Widget build(BuildContext context) => BibPageShell(
@@ -265,7 +267,7 @@ class ReviewScreen extends StatelessWidget {
         const BibPrivacyNotice(
           title: 'Continua privado',
           body:
-              'Prévia, publicação e compartilhamento serão habilitados somente em uma próxima etapa.',
+              'Você verá uma prévia antes de publicar. Nada é enviado nesta tela.',
         ),
         const SizedBox(height: BibSpacing.x5),
         Align(
@@ -273,9 +275,150 @@ class ReviewScreen extends StatelessWidget {
           child: BibTextButton(label: 'Editar', onPressed: onEdit),
         ),
         const SizedBox(height: BibSpacing.x2),
-        const BibPrimaryButton(
-          label: 'Publicação disponível na próxima etapa',
-          onPressed: null,
+        BibPrimaryButton(label: 'Ver prévia do convite', onPressed: onPreview),
+      ],
+    ),
+  );
+}
+
+class GuestPreviewScreen extends StatefulWidget {
+  const GuestPreviewScreen({
+    super.key,
+    required this.draft,
+    required this.onBack,
+    required this.onPublish,
+  });
+
+  final DraftDilemma draft;
+  final VoidCallback onBack;
+  final Future<String?> Function() onPublish;
+
+  @override
+  State<GuestPreviewScreen> createState() => _GuestPreviewScreenState();
+}
+
+class _GuestPreviewScreenState extends State<GuestPreviewScreen> {
+  var _publishing = false;
+  String? _error;
+
+  Future<void> _publish() async {
+    setState(() {
+      _publishing = true;
+      _error = null;
+    });
+    final error = await widget.onPublish();
+    if (!mounted || error == null) return;
+    setState(() {
+      _publishing = false;
+      _error = error;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => BibPageShell(
+    topBar: BibTopBar(title: 'Prévia do convite', onBack: widget.onBack),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'É assim que seu convite vai aparecer',
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
+        const SizedBox(height: BibSpacing.x3),
+        const Text(
+          'O link é privado, mas pode ser encaminhado. Você poderá revogá-lo em uma etapa futura.',
+        ),
+        const SizedBox(height: BibSpacing.x5),
+        BibGuestPreviewFrame(draft: widget.draft),
+        const SizedBox(height: BibSpacing.x5),
+        const BibPrivacyNotice(
+          title: 'Prévia social neutra',
+          body:
+              'Mensageiros não recebem nome, item, preço ou motivo na prévia do link.',
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: BibSpacing.x4),
+          BibInlineMessage(message: _error!, kind: BibMessageKind.error),
+        ],
+        const SizedBox(height: BibSpacing.x6),
+        BibPrimaryButton(
+          label: 'Publicar convite privado',
+          loading: _publishing,
+          onPressed: _publishing ? null : _publish,
+        ),
+      ],
+    ),
+  );
+}
+
+class PublishedDilemmaScreen extends StatefulWidget {
+  const PublishedDilemmaScreen({
+    super.key,
+    required this.draft,
+    required this.onShare,
+  });
+
+  final DraftDilemma draft;
+  final Future<String?> Function() onShare;
+
+  @override
+  State<PublishedDilemmaScreen> createState() => _PublishedDilemmaScreenState();
+}
+
+class _PublishedDilemmaScreenState extends State<PublishedDilemmaScreen> {
+  var _sharing = false;
+  String? _error;
+
+  Future<void> _share() async {
+    setState(() {
+      _sharing = true;
+      _error = null;
+    });
+    final error = await widget.onShare();
+    if (!mounted) return;
+    setState(() {
+      _sharing = false;
+      _error = error;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => BibPageShell(
+    topBar: const BibTopBar(title: 'Convite pronto'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const BibStatusChip(
+          label: 'Publicado de forma privada e não listada',
+          icon: Icons.lock_outline_rounded,
+        ),
+        const SizedBox(height: BibSpacing.x5),
+        Text(
+          'Seu espaço está pronto para receber perspectivas',
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
+        const SizedBox(height: BibSpacing.x3),
+        const Text(
+          'Somente quem receber o convite poderá abrir a página de voto.',
+        ),
+        const SizedBox(height: BibSpacing.x6),
+        BibDilemmaSummary(draft: widget.draft),
+        const SizedBox(height: BibSpacing.x5),
+        const BibPrivacyNotice(
+          title: 'Compartilhe com cuidado',
+          body:
+              'Links podem ser encaminhados. A prévia social permanece neutra.',
+          attention: true,
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: BibSpacing.x4),
+          BibInlineMessage(message: _error!, kind: BibMessageKind.error),
+        ],
+        const SizedBox(height: BibSpacing.x6),
+        BibPrimaryButton(
+          label: 'Compartilhar convite',
+          loading: _sharing,
+          onPressed: _sharing ? null : _share,
         ),
       ],
     ),

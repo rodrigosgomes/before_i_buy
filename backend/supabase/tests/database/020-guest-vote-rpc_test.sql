@@ -105,8 +105,8 @@ values (
   '00000000-0000-4000-8000-000000000101',
   'Vote owner',
   true,
-  'v1',
-  'v1'
+  'internal-demo-v1',
+  'internal-demo-v1'
 );
 
 insert into auth.users (id)
@@ -123,8 +123,8 @@ values (
   '00000000-0000-4000-8000-000000000109',
   'Unconfirmed owner',
   false,
-  'v1',
-  'v1'
+  'internal-demo-v1',
+  'internal-demo-v1'
 );
 
 insert into public.dilemmas (
@@ -365,7 +365,7 @@ select throws_ok(
     '90000000-0000-4000-8000-000000000109'
   )$$,
   'P0001',
-  'Adult confirmation and current consents are required.',
+  'Adult confirmation and active consent versions are required.',
   'an unconfirmed profile cannot publish'
 );
 
@@ -1083,8 +1083,8 @@ insert into public.profiles (
 ) values (
   '00000000-0000-4000-8000-000000000102',
   'Authenticated voter',
-  'v1',
-  'v1'
+  'internal-demo-v1',
+  'internal-demo-v1'
 );
 
 insert into public.participations (

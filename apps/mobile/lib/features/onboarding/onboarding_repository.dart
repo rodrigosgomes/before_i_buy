@@ -18,7 +18,8 @@ class LocalOnboarding {
   final bool privacyAccepted;
 
   bool get isComplete =>
-      displayName.trim().isNotEmpty &&
+      displayName.trim().length >= 2 &&
+      displayName.trim().length <= 50 &&
       adultConfirmed &&
       termsAccepted &&
       privacyAccepted;
