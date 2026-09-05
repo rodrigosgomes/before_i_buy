@@ -26,12 +26,14 @@ abstract interface class GoogleIdentityProvider {
 
 abstract interface class AuthSessionGateway {
   bool get isAuthenticated;
+  String? get userId;
   Stream<AuthStatus> get statusChanges;
   Future<void> signInWithGoogleTokens(GoogleIdentityCredential credential);
 }
 
 abstract interface class AuthGateway {
   bool get isAuthenticated;
+  String? get userId;
   Stream<AuthStatus> get statusChanges;
   Future<SocialAuthResult> signInWithGoogle();
 }
@@ -97,6 +99,9 @@ class SupabaseAuthSessionGateway implements AuthSessionGateway {
   bool get isAuthenticated => _auth.currentSession != null;
 
   @override
+  String? get userId => _auth.currentUser?.id;
+
+  @override
   Stream<AuthStatus> get statusChanges => _auth.onAuthStateChange.map(
     (event) =>
         event.session == null ? AuthStatus.signedOut : AuthStatus.signedIn,
@@ -128,6 +133,9 @@ class SupabaseGoogleAuthGateway implements AuthGateway {
   bool get isAuthenticated => _session.isAuthenticated;
 
   @override
+  String? get userId => _session.userId;
+
+  @override
   Stream<AuthStatus> get statusChanges => _session.statusChanges;
 
   @override
@@ -151,6 +159,10 @@ class FakeAuthGateway implements AuthGateway {
 
   final _controller = StreamController<AuthStatus>.broadcast();
   bool _authenticated;
+  String accountId = 'test-user';
+
+  @override
+  String? get userId => _authenticated ? accountId : null;
   SocialAuthResult nextGoogleResult;
   int googleSignInCount = 0;
 
@@ -169,7 +181,8 @@ class FakeAuthGateway implements AuthGateway {
     return nextGoogleResult;
   }
 
-  void completeSignIn() {
+  void completeSignIn({String? userId}) {
+    if (userId != null) accountId = userId;
     _authenticated = true;
     _controller.add(AuthStatus.signedIn);
   }

@@ -14,7 +14,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test('draft repository saves and restores the complete draft', () async {
-    final repository = SharedPreferencesDraftRepository();
+    final repository = SharedPreferencesDraftRepository(userId: 'test-user');
     final draft = const DraftDilemma(idempotencyKey: uuid).copyWith(
       itemName: 'Fone',
       priceCents: 240000,
@@ -22,25 +22,36 @@ void main() {
     );
     await repository.save(draft);
 
-    final restored = await SharedPreferencesDraftRepository().load();
+    final restored = await SharedPreferencesDraftRepository(
+      userId: 'test-user',
+    ).load();
     expect(restored?.toJson(), draft.toJson());
     expect(restored?.idempotencyKey, uuid);
     await repository.clear();
-    expect(await SharedPreferencesDraftRepository().load(), isNull);
+    expect(
+      await SharedPreferencesDraftRepository(userId: 'test-user').load(),
+      isNull,
+    );
   });
 
   test('draft repository fails closed for corrupt local data', () async {
     SharedPreferences.setMockInitialValues({
-      SharedPreferencesDraftRepository.storageKey: '{broken',
+      '${SharedPreferencesDraftRepository.storageKey}.test-user': '{broken',
     });
-    expect(await SharedPreferencesDraftRepository().load(), isNull);
+    expect(
+      await SharedPreferencesDraftRepository(userId: 'test-user').load(),
+      isNull,
+    );
 
     SharedPreferences.setMockInitialValues({
-      SharedPreferencesDraftRepository.storageKey: jsonEncode({
+      '${SharedPreferencesDraftRepository.storageKey}.test-user': jsonEncode({
         'schema_version': 99,
       }),
     });
-    expect(await SharedPreferencesDraftRepository().load(), isNull);
+    expect(
+      await SharedPreferencesDraftRepository(userId: 'test-user').load(),
+      isNull,
+    );
   });
 
   test('onboarding repository saves only its internal local fixture', () async {
@@ -50,10 +61,14 @@ void main() {
       termsAccepted: true,
       privacyAccepted: true,
     );
-    final repository = SharedPreferencesOnboardingRepository();
+    final repository = SharedPreferencesOnboardingRepository(
+      userId: 'test-user',
+    );
     await repository.save(onboarding);
 
-    final restored = await SharedPreferencesOnboardingRepository().load();
+    final restored = await SharedPreferencesOnboardingRepository(
+      userId: 'test-user',
+    ).load();
     expect(restored?.displayName, 'Lu');
     expect(restored?.isComplete, isTrue);
   });

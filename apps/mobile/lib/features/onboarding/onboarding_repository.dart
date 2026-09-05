@@ -57,15 +57,18 @@ abstract interface class OnboardingRepository {
 
 class SharedPreferencesOnboardingRepository implements OnboardingRepository {
   SharedPreferencesOnboardingRepository({
+    required this.userId,
     Future<SharedPreferences>? preferences,
   }) : _preferences = preferences ?? SharedPreferences.getInstance();
 
   static const storageKey = 'bib.onboarding.internal.v1';
   final Future<SharedPreferences> _preferences;
+  final String userId;
+  String get scopedStorageKey => '$storageKey.$userId';
 
   @override
   Future<LocalOnboarding?> load() async {
-    final raw = (await _preferences).getString(storageKey);
+    final raw = (await _preferences).getString(scopedStorageKey);
     if (raw == null) return null;
     try {
       return LocalOnboarding.fromJson(jsonDecode(raw));
@@ -76,10 +79,11 @@ class SharedPreferencesOnboardingRepository implements OnboardingRepository {
 
   @override
   Future<void> save(LocalOnboarding onboarding) async {
-    await (await _preferences).setString(
-      storageKey,
+    final saved = await (await _preferences).setString(
+      scopedStorageKey,
       jsonEncode(onboarding.toJson()),
     );
+    if (!saved) throw StateError('Local onboarding was not saved.');
   }
 }
 

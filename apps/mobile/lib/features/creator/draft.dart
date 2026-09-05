@@ -48,6 +48,7 @@ class DraftDilemma {
     this.reason = '',
     this.purpose = DraftPurpose.forSelf,
     this.pauseHours = 72,
+    this.publicationPending = false,
   });
 
   static const schemaVersion = 1;
@@ -60,6 +61,7 @@ class DraftDilemma {
   final String reason;
   final DraftPurpose purpose;
   final int pauseHours;
+  final bool publicationPending;
 
   Map<DraftField, String> get validationErrors {
     final errors = <DraftField, String>{};
@@ -93,6 +95,7 @@ class DraftDilemma {
     String? reason,
     DraftPurpose? purpose,
     int? pauseHours,
+    bool? publicationPending,
   }) => DraftDilemma(
     idempotencyKey: idempotencyKey,
     itemName: itemName ?? this.itemName,
@@ -101,6 +104,7 @@ class DraftDilemma {
     reason: reason ?? this.reason,
     purpose: purpose ?? this.purpose,
     pauseHours: pauseHours ?? this.pauseHours,
+    publicationPending: publicationPending ?? this.publicationPending,
   );
 
   Map<String, Object> toJson() => {
@@ -112,6 +116,7 @@ class DraftDilemma {
     'reason': reason,
     'purpose': purpose.backendValue,
     'pause_hours': pauseHours,
+    'publication_pending': publicationPending,
   };
 
   static DraftDilemma? fromJson(Object? value) {
@@ -150,6 +155,7 @@ class DraftDilemma {
       reason: reason,
       purpose: purpose,
       pauseHours: pauseHours,
+      publicationPending: value['publication_pending'] == true,
     );
   }
 

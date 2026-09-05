@@ -168,6 +168,8 @@ void main() {
 
     await tapVisible(tester, find.text('Ver prévia do convite'));
     expect(find.text('Prévia — nenhuma ação será enviada.'), findsOneWidget);
+    expect(find.text('Lu pediu sua perspectiva'), findsOneWidget);
+    expect(publication.published, isEmpty);
     await tapVisible(tester, find.text('Publicar convite privado'));
     expect(
       find.text('Seu espaço está pronto para receber perspectivas'),
@@ -325,7 +327,7 @@ void main() {
 
     expect(
       find.text(
-        'Não foi possível publicar agora. Seu rascunho continua salvo.',
+        'Não recebemos a confirmação. Tente novamente para recuperar o mesmo convite.',
       ),
       findsOneWidget,
     );

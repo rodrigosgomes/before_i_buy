@@ -418,7 +418,13 @@ class BibDilemmaSummary extends StatelessWidget {
 }
 
 class BibGuestPreviewFrame extends StatelessWidget {
-  const BibGuestPreviewFrame({super.key, required this.draft});
+  const BibGuestPreviewFrame({
+    super.key,
+    required this.draft,
+    required this.creatorName,
+  });
+
+  final String creatorName;
 
   final DraftDilemma draft;
 
@@ -443,7 +449,7 @@ class BibGuestPreviewFrame extends StatelessWidget {
             ),
             const SizedBox(height: BibSpacing.x4),
             Text(
-              'Um amigo pediu sua perspectiva',
+              '$creatorName pediu sua perspectiva',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: BibSpacing.x3),

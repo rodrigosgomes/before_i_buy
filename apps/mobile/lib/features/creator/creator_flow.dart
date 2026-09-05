@@ -285,11 +285,13 @@ class GuestPreviewScreen extends StatefulWidget {
   const GuestPreviewScreen({
     super.key,
     required this.draft,
+    required this.creatorName,
     required this.onBack,
     required this.onPublish,
   });
 
   final DraftDilemma draft;
+  final String creatorName;
   final VoidCallback onBack;
   final Future<String?> Function() onPublish;
 
@@ -316,7 +318,12 @@ class _GuestPreviewScreenState extends State<GuestPreviewScreen> {
 
   @override
   Widget build(BuildContext context) => BibPageShell(
-    topBar: BibTopBar(title: 'Prévia do convite', onBack: widget.onBack),
+    topBar: BibTopBar(
+      title: 'Prévia do convite',
+      onBack: _publishing || widget.draft.publicationPending
+          ? null
+          : widget.onBack,
+    ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -329,7 +336,17 @@ class _GuestPreviewScreenState extends State<GuestPreviewScreen> {
           'O link é privado, mas pode ser encaminhado. Você poderá revogá-lo em uma etapa futura.',
         ),
         const SizedBox(height: BibSpacing.x5),
-        BibGuestPreviewFrame(draft: widget.draft),
+        if (widget.draft.publicationPending) ...[
+          const BibInlineMessage(
+            message:
+                'Publicação não confirmada. O convite pode já existir. Confira o conteúdo e tente novamente para recuperar o mesmo convite.',
+          ),
+          const SizedBox(height: BibSpacing.x4),
+        ],
+        BibGuestPreviewFrame(
+          draft: widget.draft,
+          creatorName: widget.creatorName,
+        ),
         const SizedBox(height: BibSpacing.x5),
         const BibPrivacyNotice(
           title: 'Prévia social neutra',

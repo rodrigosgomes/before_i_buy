@@ -11,15 +11,19 @@ abstract interface class DraftRepository {
 }
 
 class SharedPreferencesDraftRepository implements DraftRepository {
-  SharedPreferencesDraftRepository({Future<SharedPreferences>? preferences})
-    : _preferences = preferences ?? SharedPreferences.getInstance();
+  SharedPreferencesDraftRepository({
+    required this.userId,
+    Future<SharedPreferences>? preferences,
+  }) : _preferences = preferences ?? SharedPreferences.getInstance();
 
   static const storageKey = 'bib.draft.v1';
   final Future<SharedPreferences> _preferences;
+  final String userId;
+  String get scopedStorageKey => '$storageKey.$userId';
 
   @override
   Future<DraftDilemma?> load() async {
-    final raw = (await _preferences).getString(storageKey);
+    final raw = (await _preferences).getString(scopedStorageKey);
     if (raw == null) return null;
     try {
       return DraftDilemma.fromJson(jsonDecode(raw));
@@ -30,15 +34,17 @@ class SharedPreferencesDraftRepository implements DraftRepository {
 
   @override
   Future<void> save(DraftDilemma draft) async {
-    await (await _preferences).setString(
-      storageKey,
+    final saved = await (await _preferences).setString(
+      scopedStorageKey,
       jsonEncode(draft.toJson()),
     );
+    if (!saved) throw StateError('Local draft was not saved.');
   }
 
   @override
   Future<void> clear() async {
-    await (await _preferences).remove(storageKey);
+    final removed = await (await _preferences).remove(scopedStorageKey);
+    if (!removed) throw StateError('Local draft was not cleared.');
   }
 }
 

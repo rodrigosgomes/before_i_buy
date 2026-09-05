@@ -1,6 +1,6 @@
 begin;
 
-select plan(13);
+select plan(18);
 
 create or replace function pg_temp.upsert_profile_as_authenticated(
   p_user_id uuid,
@@ -146,6 +146,56 @@ select is(
   public.creator_profile_has_active_consents('forged-v1', 'forged-v1'),
   false,
   'forged consent versions do not satisfy publication'
+);
+
+
+create function pg_temp.publish_as_creator(p_user_id uuid) returns void
+language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_user_id::text, true);
+  set local role authenticated;
+  perform * from public.publish_dilemma(
+    'Fone', 10000, 'BRL', 'other', 'for_self', 'Para viagens longas',
+    null, 24, '00000000-0000-4000-8000-000000000399'
+  );
+  reset role;
+exception when others then
+  reset role;
+  raise;
+end;
+$$;
+
+select throws_ok(
+  $$select pg_temp.publish_as_creator('00000000-0000-4000-8000-000000000302')$$,
+  'P0001', 'Adult confirmation and active consent versions are required.',
+  'publication rejects a missing profile'
+);
+update public.profiles set terms_accepted_version = 'forged-v1'
+where id = '00000000-0000-4000-8000-000000000301';
+select throws_ok(
+  $$select pg_temp.publish_as_creator('00000000-0000-4000-8000-000000000301')$$,
+  'P0001', 'Adult confirmation and active consent versions are required.',
+  'publication enforces active consent rather than only the helper'
+);
+update public.profiles set terms_accepted_version = 'internal-demo-v1'
+where id = '00000000-0000-4000-8000-000000000301';
+update public.creator_consent_versions set is_active = false where document_kind = 'terms';
+select throws_ok(
+  $$select pg_temp.publish_as_creator('00000000-0000-4000-8000-000000000301')$$,
+  'P0001', 'Adult confirmation and active consent versions are required.',
+  'deactivating consent blocks publication with an existing profile'
+);
+select throws_ok(
+  $$select pg_temp.upsert_profile_as_authenticated(
+    '00000000-0000-4000-8000-000000000301', 'Creator Dev'
+  )$$,
+  'P0001', 'The internal development consent version is unavailable.',
+  'deactivating consent also blocks profile synchronization'
+);
+update public.creator_consent_versions set is_active = true where document_kind = 'terms';
+select lives_ok(
+  $$select pg_temp.publish_as_creator('00000000-0000-4000-8000-000000000301')$$,
+  'a profile with active server consent can publish'
 );
 
 select * from finish();

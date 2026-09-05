@@ -41,6 +41,7 @@ dependencies:
   share_plus: ^12.0.2
 
 dev_dependencies:
+  http: ^1.6.0
   flutter_test:
     sdk: flutter
 

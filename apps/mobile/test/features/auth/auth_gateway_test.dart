@@ -100,6 +100,9 @@ class _MemorySession implements AuthSessionGateway {
   bool get isAuthenticated => _authenticated;
 
   @override
+  String? get userId => _authenticated ? 'test-user' : null;
+
+  @override
   Stream<AuthStatus> get statusChanges => _statuses.stream;
 
   @override

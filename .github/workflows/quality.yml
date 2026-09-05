@@ -57,6 +57,15 @@ jobs:
         run: supabase test db
       - name: Run guest-session concurrency test
         run: npm run test:db-concurrency
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install mobile integration dependencies
+        run: flutter pub get
+        working-directory: apps/mobile
+      - name: Run mobile to local Supabase integration
+        run: node scripts/ci/test-mobile-supabase.mjs
+        working-directory: .
       - name: Run Edge Function contract tests
         run: npm run test:edge-contract
       - name: Run Edge Function runtime smoke test

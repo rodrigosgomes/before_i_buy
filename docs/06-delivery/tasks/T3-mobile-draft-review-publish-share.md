@@ -1,6 +1,6 @@
 # Task 3 — mobile do criador: rascunho, revisão, publicação e compartilhamento
 
-**Status:** Task 3B planejada e autorizada para implementação interna; Task 3A concluída
+**Status:** Task 3A concluída; Task 3B implementada e revisada, com validação local e pendências de fechamento registradas na task filha
 **Tipo:** vertical slice mobile, privacidade e integração  
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)  
 **Depende de:** [Task 2 — web de convidado](T2-guest-web-same-origin-voting.md)
@@ -20,9 +20,9 @@ antecipa decisão, reflexão, Reveal ou IA.
 
 A RPC existente `publish_dilemma` exige `auth.uid()` e um perfil que tenha
 `display_name`, confirmação de maioridade e versões vigentes de Termos e Aviso
-de Privacidade. Não há, no repositório, cliente mobile, fluxo de autenticação,
-versões de consentimento aprovadas ou ambiente Supabase que o aplicativo possa
-usar.
+de Privacidade. O cliente mobile e o Google Sign-In estão implementados. A
+Task 3B usa consentimentos internos versionados pela DEC-015; documentos
+jurídicos aprovados e liberação externa continuam fora desse ambiente.
 
 A [DEC-014](../DECISION_LOG.md#dec-014-autenticação-nativa-do-criador-por-google)
 adotou Google Sign-In nativo para o criador. A implementação usa URL, chave
@@ -79,7 +79,7 @@ uma chave de serviço no app é proibido.
 | Integração | cliente autenticado chama apenas `publish_dilemma`; resposta cria convite e retry repete o mesmo resultado. |
 | Widget | banners, erros, ordem de foco, prévia fiel e CTA de publicação explícita. |
 | E2E | offline → reinício → revisão → prévia → publicação → share cancelado; depois integra com o E2E Web existente. |
-| RLS negativo | Task não muda RLS; a suíte de banco existente continua obrigatória. |
+| RLS negativo | Task 3B restringe escrita direta de perfil e testa consentimentos; a suíte negativa de banco permanece obrigatória. |
 
 ## 7. Privacidade, risco e rollback
 

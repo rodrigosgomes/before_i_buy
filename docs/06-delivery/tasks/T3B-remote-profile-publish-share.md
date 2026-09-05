@@ -1,6 +1,6 @@
 # Task 3B — perfil remoto, publicação explícita e compartilhamento privado
 
-**Status:** planejada e autorizada para implementação interna
+**Status:** validação local concluída e revisões sem achados; pendentes validação manual de desenvolvimento e CI/merge
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)
 **Decisão:** [DEC-015](../DECISION_LOG.md#dec-015-consentimento-interno-versionado-para-publicação-no-desenvolvimento)
 **Depende de:** Task 3A concluída; contrato de publicação e voto já versionado
@@ -90,3 +90,80 @@ Produto tenta publicar antes da prévia ou criar urgência. Segurança tenta
 forjar versão, mudar perfil de terceiro, usar token/URL fora do share e publicar
 sem perfil. Privacidade tenta transformar a fixture em base jurídica. QA corta
 a rede, reinicia o app, repete a ação e cancela a folha nativa.
+
+## Plano de fechamento — 2026-09-04
+
+A revisão independente encontrou bloqueadores de isolamento de contas, respostas
+assíncronas após logout, recuperação offline e retry após resposta perdida.
+Correções vinculadas a esta task:
+
+1. Particionar onboarding e rascunho pelo ID autenticado; dados legados sem dono
+   não são atribuídos automaticamente a uma conta.
+2. Invalidar operações da sessão anterior e preservar a tela em refresh da mesma
+   conta. Respostas tardias não exibem convites nem apagam dados de outra sessão.
+3. Recuperar rascunhos sem consulta remota obrigatória; verificar perfil na
+   publicação e manter sincronização explícita quando necessária.
+4. Persistir o snapshot da tentativa antes da RPC; após tentativa ambígua,
+   mostrar “Publicação não confirmada”, impedir edição do payload e permitir
+   retry explícito com a mesma chave, inclusive após reinício.
+5. Adicionar regressões para cada cenário, contratos reais dos gateways e
+   enforcement de consentimentos na RPC; repetir gates e revisões.
+
+Produto revisou o plano sem impedimentos, exigindo a indicação honesta do estado
+ambíguo. Nenhuma publicação automática, deploy ou liberação externa é incluída.
+
+A validação de sistema usará exclusivamente a stack local: cliente Dart real →
+Auth local de teste → RPC de perfil → publicação/retry → sessão/voto no banco.
+A conta sintética será removida ao final; o script recusa origem remota. O job de
+banco no CI executará esse teste além dos gates existentes. Login Google nativo
+em dispositivo e folha de compartilhamento continuam validações manuais distintas.
+
+Correção de gate detectada no fechamento: habilitar reporter LCOV no Vitest;
+o workflow já exigia `coverage/lcov.info`, mas a configuração não o gerava.
+Os thresholds permanecem inalterados. O teste de sistema mobile fica em
+`test/system`, separado da suíte offline e obrigatório no job de banco via
+script com configuração local validada.
+
+## Evidências de revisão e limites do fechamento — 2026-09-04
+
+- Segurança/privacidade: revisão final sem achados após isolamento por conta e
+  invalidação de respostas tardias.
+- QA: revisão final sem achados após bloqueio de edição durante tentativa,
+  snapshot persistido, recuperação offline e tratamento de gravação/remoção
+  que retorna `false`.
+- Produto: revisão final sem achados; prévia exibe o nome escolhido e o estado
+  ambíguo não afirma que o dilema continua não compartilhado.
+- Mobile: `flutter pub get`, `dart format --output=none --set-exit-if-changed .`,
+  `flutter analyze` e `flutter test --coverage --reporter expanded` passaram:
+  **53 testes, 94,62% de linhas**, gate LCOV >=80% aprovado. A suíte offline
+  registra um teste de sistema separado; ele é executado sem skip pelo gate
+  obrigatório `node scripts/ci/test-mobile-supabase.mjs` com Supabase local.
+  Regressões incluem conta A/B, resposta após logout, refresh de sessão,
+  gravação recusada, snapshot após timeout/reinício, share e 320px/200% texto.
+- Banco: `npm run db:migrate` local sem migrations pendentes;
+  `npm run db:test`: **144 testes passaram**.
+- Backend: `npm run test:db-concurrency`: **4 passaram**;
+  `npm run test:edge-contract`: passou, **95,53% linhas / 90% branches**;
+  `npm run test:edge-runtime`: passou na stack local.
+- Web: `npm run lint`, `npm run test:coverage` (**9 passaram; 94,31% linhas**)
+  e gate LCOV >=80% passaram; `npm run e2e:critical`: **2 passaram**.
+  O E2E usa upstream sintético; o runtime real da Edge é validado separadamente.
+- Sistema: cliente Dart real, Auth local sintético, perfil, snapshot restaurado,
+  retry idempotente, abertura de convite e voto pelas RPCs passaram contra
+  Supabase local. Não é evidência de Google Sign-In nativo ou share em aparelho.
+
+Pendências que impedem declarar a task integralmente fechada:
+
+1. `GUEST_INVITE_BASE_URL` está configurado localmente como
+   `https://guest.example.com`, um host HTTPS de desenvolvimento/placeholder.
+   Substituí-lo pelo domínio real do Web convidado antes do teste manual; isso
+   não antecipa deploy público.
+2. Teste manual com usuário Google permitido em dispositivo: perfil → prévia →
+   publicação, retry controlado e folha nativa de share/cancelamento. Registrar
+   o resultado sem token/URL de convite em evidências.
+3. Commit/PR e jobs remotos de CI verdes antes de merge. Nesta validação não
+   houve push, merge, deploy nem aplicação de migration em projeto remoto.
+
+A autorização desta rodada cobriu correções e validações locais. O AGENTS.md
+exige pedido explícito para operações externas. A aprovação de beta externo,
+textos jurídicos reais, Apple Sign-In e lojas permanece fora da Task 3B.

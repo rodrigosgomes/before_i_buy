@@ -21,17 +21,14 @@ class BeforeIBuyApp extends StatelessWidget {
     super.key,
     this.config = AppConfig.fromEnvironment,
     this.authGateway,
-    OnboardingRepository? onboardingRepository,
-    DraftRepository? draftRepository,
+    this.onboardingRepository,
+    this.draftRepository,
     CreatorProfileGateway? creatorProfileGateway,
     DilemmaPublicationGateway? publicationGateway,
     InviteShareGateway? shareGateway,
     String Function()? createId,
     TargetPlatform? platform,
-  }) : onboardingRepository =
-           onboardingRepository ?? SharedPreferencesOnboardingRepository(),
-       draftRepository = draftRepository ?? SharedPreferencesDraftRepository(),
-       creatorProfileGateway =
+  }) : creatorProfileGateway =
            creatorProfileGateway ?? MemoryCreatorProfileGateway(),
        publicationGateway =
            publicationGateway ?? MemoryDilemmaPublicationGateway(),
@@ -41,8 +38,8 @@ class BeforeIBuyApp extends StatelessWidget {
 
   final AppConfig config;
   final AuthGateway? authGateway;
-  final OnboardingRepository onboardingRepository;
-  final DraftRepository draftRepository;
+  final OnboardingRepository? onboardingRepository;
+  final DraftRepository? draftRepository;
   final CreatorProfileGateway creatorProfileGateway;
   final DilemmaPublicationGateway publicationGateway;
   final InviteShareGateway shareGateway;
@@ -97,8 +94,8 @@ class AppFlow extends StatefulWidget {
 
   final AppConfig config;
   final AuthGateway? authGateway;
-  final OnboardingRepository onboardingRepository;
-  final DraftRepository draftRepository;
+  final OnboardingRepository? onboardingRepository;
+  final DraftRepository? draftRepository;
   final CreatorProfileGateway creatorProfileGateway;
   final DilemmaPublicationGateway publicationGateway;
   final InviteShareGateway shareGateway;
@@ -117,6 +114,56 @@ class _AppFlowState extends State<AppFlow> {
   bool _recoveredDraft = false;
   DraftDilemma? _publishedDraft;
   Uri? _publishedInviteUri;
+  String? _userId;
+  int _sessionGeneration = 0;
+  Future<void> _draftWrites = Future.value();
+  Object? _draftWriteError;
+  bool _publishing = false;
+
+  OnboardingRepository get _onboardingRepository =>
+      widget.onboardingRepository ??
+      SharedPreferencesOnboardingRepository(userId: _userId!);
+  DraftRepository get _draftRepository =>
+      widget.draftRepository ??
+      SharedPreferencesDraftRepository(userId: _userId!);
+
+  bool _isCurrent(int generation) =>
+      mounted &&
+      generation == _sessionGeneration &&
+      _userId != null &&
+      widget.authGateway?.userId == _userId;
+
+  void _sessionChanged() {
+    final userId = widget.authGateway!.userId;
+    if (userId == _userId && userId != null) return;
+    _sessionGeneration++;
+    _userId = userId;
+    _onboarding = null;
+    _draft = null;
+    _publishedDraft = null;
+    _publishedInviteUri = null;
+    _publishing = false;
+    _draftWriteError = null;
+    _draftWrites = Future.value();
+    if (userId == null) {
+      if (mounted) setState(() => _stage = AppStage.googleSignIn);
+    } else {
+      _resolveAuthenticatedState();
+    }
+  }
+
+  void _saveDraft(DraftDilemma draft) {
+    final repository = _draftRepository;
+    final generation = _sessionGeneration;
+    _draftWrites = _draftWrites
+        .then((_) => repository.save(draft))
+        .then((_) {
+          if (_isCurrent(generation)) _draftWriteError = null;
+        })
+        .catchError((Object error) {
+          if (_isCurrent(generation)) _draftWriteError = error;
+        });
+  }
 
   @override
   void initState() {
@@ -130,58 +177,68 @@ class _AppFlowState extends State<AppFlow> {
       if (mounted) setState(() => _stage = AppStage.configurationMissing);
       return;
     }
-    _authSubscription = widget.authGateway!.statusChanges.listen((status) {
-      if (status == AuthStatus.signedIn) {
-        _resolveAuthenticatedState();
-      } else if (mounted) {
-        setState(() => _stage = AppStage.googleSignIn);
-      }
+    _authSubscription = widget.authGateway!.statusChanges.listen((_) {
+      _sessionChanged();
     });
-    if (widget.authGateway!.isAuthenticated) {
-      await _resolveAuthenticatedState();
-    } else if (mounted) {
-      setState(() => _stage = AppStage.googleSignIn);
-    }
+    _sessionChanged();
   }
 
   Future<void> _resolveAuthenticatedState() async {
+    final generation = _sessionGeneration;
+    final onboardingRepository = _onboardingRepository;
+    final draftRepository = _draftRepository;
     if (mounted) setState(() => _stage = AppStage.loading);
-    final onboarding = await widget.onboardingRepository.load();
-    if (!mounted) return;
+    final onboarding = await onboardingRepository.load();
+    if (!_isCurrent(generation)) return;
     _onboarding = onboarding;
     if (onboarding?.isComplete != true) {
       setState(() => _stage = AppStage.onboarding);
       return;
     }
-    final profileStatus = await widget.creatorProfileGateway.status();
-    if (!mounted) return;
-    if (profileStatus != CreatorProfileStatus.ready) {
-      setState(() => _stage = AppStage.profileSync);
+    final draft = await draftRepository.load();
+    if (!_isCurrent(generation)) return;
+    if (draft != null) {
+      _showDraft(draft);
       return;
     }
-    await _loadDraftAfterProfile();
+    final profileStatus = await widget.creatorProfileGateway.status();
+    if (!_isCurrent(generation)) return;
+    setState(
+      () => _stage = profileStatus == CreatorProfileStatus.needsSync
+          ? AppStage.profileSync
+          : AppStage.home,
+    );
   }
 
   Future<void> _completeOnboarding(LocalOnboarding onboarding) async {
-    await widget.onboardingRepository.save(onboarding);
-    if (!mounted) return;
+    final generation = _sessionGeneration;
+    await _onboardingRepository.save(onboarding);
+    if (!_isCurrent(generation)) return;
     _onboarding = onboarding;
     setState(() => _stage = AppStage.profileSync);
   }
 
-  Future<void> _loadDraftAfterProfile() async {
-    final draft = await widget.draftRepository.load();
-    if (!mounted) return;
+  void _showDraft(DraftDilemma? draft) {
     _draft = draft;
     _recoveredDraft = draft != null;
-    setState(() => _stage = draft == null ? AppStage.home : AppStage.draft);
+    setState(
+      () => _stage = draft == null
+          ? AppStage.home
+          : draft.publicationPending
+          ? AppStage.preview
+          : AppStage.draft,
+    );
   }
 
   Future<String?> _syncProfile() async {
+    final generation = _sessionGeneration;
+    final repository = _draftRepository;
     try {
       await widget.creatorProfileGateway.sync(_onboarding!);
-      if (!mounted) return null;
-      await _loadDraftAfterProfile();
+      if (!_isCurrent(generation)) return null;
+      final draft = await repository.load();
+      if (!_isCurrent(generation)) return null;
+      _showDraft(draft);
       return null;
     } catch (_) {
       return 'Não foi possível salvar seu perfil agora. Tente novamente.';
@@ -192,29 +249,54 @@ class _AppFlowState extends State<AppFlow> {
     final draft = _draft ?? DraftDilemma(idempotencyKey: widget.createId());
     _draft = draft;
     _recoveredDraft = false;
-    widget.draftRepository.save(draft);
+    _saveDraft(draft);
     setState(() => _stage = AppStage.draft);
   }
 
   void _updateDraft(DraftDilemma draft) {
+    if (_publishing || _draft?.publicationPending == true) return;
     _draft = draft;
-    widget.draftRepository.save(draft);
+    _saveDraft(draft);
     setState(() {});
   }
 
   Future<String?> _publish() async {
     final draft = _draft;
-    final linkBuilder = GuestInviteLinkBuilder(
-      widget.config.guestInviteBaseUri,
-    );
-    if (draft == null || widget.config.guestInviteBaseUri == null) {
+    final generation = _sessionGeneration;
+    if (_publishing || !_isCurrent(generation)) return null;
+    if (draft == null ||
+        !draft.isValid ||
+        widget.config.guestInviteBaseUri == null) {
       return 'O convite ainda não está configurado para este ambiente.';
     }
+    final repository = _draftRepository;
+    _publishing = true;
     try {
-      final published = await widget.publicationGateway.publish(draft);
-      final inviteUri = linkBuilder.build(published.inviteToken);
-      await widget.draftRepository.clear();
-      if (!mounted) return null;
+      final profileStatus = await widget.creatorProfileGateway.status();
+      if (!_isCurrent(generation)) return null;
+      if (profileStatus == CreatorProfileStatus.needsSync) {
+        setState(() => _stage = AppStage.profileSync);
+        return null;
+      }
+      if (profileStatus == CreatorProfileStatus.unavailable) {
+        return 'Sem conexão para publicar. Seu rascunho continua salvo.';
+      }
+      await _draftWrites;
+      if (!_isCurrent(generation)) return null;
+      if (_draftWriteError != null) {
+        return 'Não foi possível salvar neste aparelho. Tente novamente.';
+      }
+      final pending = draft.copyWith(publicationPending: true);
+      await repository.save(pending);
+      if (!_isCurrent(generation)) return null;
+      setState(() => _draft = pending);
+      final published = await widget.publicationGateway.publish(pending);
+      if (!_isCurrent(generation)) return null;
+      final inviteUri = GuestInviteLinkBuilder(
+        widget.config.guestInviteBaseUri,
+      ).build(published.inviteToken);
+      await repository.clear();
+      if (!_isCurrent(generation)) return null;
       setState(() {
         _publishedDraft = draft;
         _publishedInviteUri = inviteUri;
@@ -224,11 +306,18 @@ class _AppFlowState extends State<AppFlow> {
       });
       return null;
     } catch (_) {
-      return 'Não foi possível publicar agora. Seu rascunho continua salvo.';
+      return _draft?.publicationPending == true
+          ? 'Não recebemos a confirmação. Tente novamente para recuperar o mesmo convite.'
+          : 'Não foi possível salvar neste aparelho. Tente novamente.';
+    } finally {
+      if (_isCurrent(generation)) _publishing = false;
     }
   }
 
   Future<String?> _share() async {
+    if (!_isCurrent(_sessionGeneration) || _publishedInviteUri == null) {
+      return null;
+    }
     try {
       await widget.shareGateway.share(_publishedInviteUri!);
       return null;
@@ -273,7 +362,12 @@ class _AppFlowState extends State<AppFlow> {
     ),
     AppStage.preview => GuestPreviewScreen(
       draft: _draft!,
-      onBack: () => setState(() => _stage = AppStage.review),
+      creatorName: _onboarding!.displayName.trim(),
+      onBack: () {
+        if (!_publishing && _draft?.publicationPending != true) {
+          setState(() => _stage = AppStage.review);
+        }
+      },
       onPublish: _publish,
     ),
     AppStage.published => PublishedDilemmaScreen(
