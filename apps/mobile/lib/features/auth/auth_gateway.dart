@@ -29,6 +29,7 @@ abstract interface class AuthSessionGateway {
   String? get userId;
   Stream<AuthStatus> get statusChanges;
   Future<void> signInWithGoogleTokens(GoogleIdentityCredential credential);
+  Future<void> signOut();
 }
 
 abstract interface class AuthGateway {
@@ -36,6 +37,7 @@ abstract interface class AuthGateway {
   String? get userId;
   Stream<AuthStatus> get statusChanges;
   Future<SocialAuthResult> signInWithGoogle();
+  Future<void> signOut();
 }
 
 class GoogleSignInIdentityProvider implements GoogleIdentityProvider {
@@ -117,6 +119,9 @@ class SupabaseAuthSessionGateway implements AuthSessionGateway {
       accessToken: credential.accessToken,
     );
   }
+
+  @override
+  Future<void> signOut() => _auth.signOut();
 }
 
 class SupabaseGoogleAuthGateway implements AuthGateway {
@@ -149,6 +154,9 @@ class SupabaseGoogleAuthGateway implements AuthGateway {
       return SocialAuthResult.failed;
     }
   }
+
+  @override
+  Future<void> signOut() => _session.signOut();
 }
 
 class FakeAuthGateway implements AuthGateway {
@@ -187,9 +195,11 @@ class FakeAuthGateway implements AuthGateway {
     _controller.add(AuthStatus.signedIn);
   }
 
-  void signOut() {
+  @override
+  Future<void> signOut() {
     _authenticated = false;
     _controller.add(AuthStatus.signedOut);
+    return Future.value();
   }
 
   Future<void> close() => _controller.close();

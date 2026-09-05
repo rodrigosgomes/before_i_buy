@@ -780,6 +780,63 @@ void main() {
       expect(await invites.getInviteUri(gateway.accountB.id), isNotNull);
     },
   );
+
+  testWidgets('tapping sign out on Home returns to Google sign-in screen', (
+    tester,
+  ) async {
+    final auth = FakeAuthGateway(authenticated: true);
+    await tester.pumpWidget(
+      testApp(
+        auth: auth,
+        onboarding: MemoryOnboardingRepository(completeOnboarding),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Before I Buy'), findsOneWidget);
+    final signOutButton = find.byTooltip('Sair da conta');
+    expect(signOutButton, findsOneWidget);
+
+    await tester.tap(signOutButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continuar com Google'), findsOneWidget);
+    expect(auth.isAuthenticated, isFalse);
+  });
+
+  testWidgets(
+    'tapping sign out on Draft screen returns to Google sign-in screen',
+    (tester) async {
+      final auth = FakeAuthGateway(authenticated: true);
+      final draft = DraftDilemma(
+        idempotencyKey: uuid,
+        itemName: 'Fone de Ouvido',
+        priceCents: 15000,
+        category: ItemCategory.techElectronics,
+        reason: 'Trabalhar com mais foco sem barulho.',
+        purpose: DraftPurpose.forSelf,
+        pauseHours: 72,
+      );
+      await tester.pumpWidget(
+        testApp(
+          auth: auth,
+          onboarding: MemoryOnboardingRepository(completeOnboarding),
+          drafts: MemoryDraftRepository(draft),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nova tentação'), findsOneWidget);
+      final signOutButton = find.byTooltip('Sair da conta');
+      expect(signOutButton, findsOneWidget);
+
+      await tester.tap(signOutButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Continuar com Google'), findsOneWidget);
+      expect(auth.isAuthenticated, isFalse);
+    },
+  );
 }
 
 class _DelayedActiveInviteRepository implements ActiveInviteRepository {

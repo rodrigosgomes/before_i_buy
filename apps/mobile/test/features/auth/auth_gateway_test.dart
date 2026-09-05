@@ -73,6 +73,24 @@ void main() {
       await auth.close();
     },
   );
+
+  test('delegates signOut to session gateway and notifies status', () async {
+    final session = _MemorySession();
+    final gateway = SupabaseGoogleAuthGateway(
+      identityProvider: _Identity(credential: credential),
+      session: session,
+    );
+    final statuses = <AuthStatus>[];
+    final subscription = gateway.statusChanges.listen(statuses.add);
+
+    await gateway.signInWithGoogle();
+    await gateway.signOut();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(gateway.isAuthenticated, isFalse);
+    expect(statuses, [AuthStatus.signedIn, AuthStatus.signedOut]);
+    await subscription.cancel();
+  });
 }
 
 class _Identity implements GoogleIdentityProvider {
@@ -113,5 +131,12 @@ class _MemorySession implements AuthSessionGateway {
     credentials.add(credential);
     _authenticated = true;
     _statuses.add(AuthStatus.signedIn);
+  }
+
+  @override
+  Future<void> signOut() async {
+    if (error != null) throw error!;
+    _authenticated = false;
+    _statuses.add(AuthStatus.signedOut);
   }
 }

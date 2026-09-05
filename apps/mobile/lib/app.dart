@@ -507,6 +507,16 @@ class _AppFlowState extends State<AppFlow> {
     }
   }
 
+  Future<void> _signOut() async {
+    try {
+      await widget.authGateway?.signOut();
+    } finally {
+      if (mounted && widget.authGateway?.userId == null) {
+        setState(() => _stage = AppStage.googleSignIn);
+      }
+    }
+  }
+
   @override
   void dispose() {
     _authSubscription?.cancel();
@@ -538,6 +548,7 @@ class _AppFlowState extends State<AppFlow> {
       onRetry: () async {
         await _refreshDilemmas();
       },
+      onSignOut: _signOut,
     ),
     AppStage.draft => DraftScreen(
       draft: _draft!,
@@ -545,6 +556,7 @@ class _AppFlowState extends State<AppFlow> {
       onChanged: _updateDraft,
       onReview: () => setState(() => _stage = AppStage.review),
       onBack: () => setState(() => _stage = AppStage.home),
+      onSignOut: _signOut,
     ),
     AppStage.review => ReviewScreen(
       draft: _draft!,

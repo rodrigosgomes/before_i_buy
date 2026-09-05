@@ -13,6 +13,7 @@ class CreatorHomeScreen extends StatelessWidget {
     this.onSelectDilemma,
     this.loadError,
     this.onRetry,
+    this.onSignOut,
   });
 
   final VoidCallback onCreate;
@@ -20,11 +21,27 @@ class CreatorHomeScreen extends StatelessWidget {
   final ValueChanged<CreatorDilemmaSummary>? onSelectDilemma;
   final String? loadError;
   final Future<void> Function()? onRetry;
+  final Future<void> Function()? onSignOut;
+
+  PreferredSizeWidget? _buildTopBar() => onSignOut == null
+      ? null
+      : BibTopBar(
+          title: 'Before I Buy',
+          actions: [
+            IconButton(
+              onPressed: onSignOut,
+              tooltip: 'Sair da conta',
+              icon: const Icon(Icons.logout_rounded),
+            ),
+          ],
+        );
 
   @override
   Widget build(BuildContext context) {
+    final topBar = _buildTopBar();
     if (dilemmas.isNotEmpty) {
       return BibPageShell(
+        topBar: topBar,
         bottom: BibPrimaryButton(
           label: 'Criar nova tentação',
           onPressed: onCreate,
@@ -59,6 +76,7 @@ class CreatorHomeScreen extends StatelessWidget {
     }
 
     return BibPageShell(
+      topBar: topBar,
       scrollable: false,
       bottom: BibPrimaryButton(
         label: 'Criar minha primeira tentação',
@@ -220,6 +238,7 @@ class DraftScreen extends StatefulWidget {
     required this.onChanged,
     required this.onReview,
     required this.onBack,
+    this.onSignOut,
   });
 
   final DraftDilemma draft;
@@ -227,6 +246,7 @@ class DraftScreen extends StatefulWidget {
   final ValueChanged<DraftDilemma> onChanged;
   final VoidCallback onReview;
   final VoidCallback onBack;
+  final Future<void> Function()? onSignOut;
 
   @override
   State<DraftScreen> createState() => _DraftScreenState();
@@ -277,7 +297,19 @@ class _DraftScreenState extends State<DraftScreen> {
         ? widget.draft.validationErrors
         : const <DraftField, String>{};
     return BibPageShell(
-      topBar: BibTopBar(title: 'Nova tentação', onBack: widget.onBack),
+      topBar: BibTopBar(
+        title: 'Nova tentação',
+        onBack: widget.onBack,
+        actions: widget.onSignOut == null
+            ? null
+            : [
+                IconButton(
+                  onPressed: widget.onSignOut,
+                  tooltip: 'Sair da conta',
+                  icon: const Icon(Icons.logout_rounded),
+                ),
+              ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
