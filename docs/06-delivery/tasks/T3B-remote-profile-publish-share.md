@@ -1,6 +1,6 @@
 # Task 3B — perfil remoto, publicação explícita e compartilhamento privado
 
-**Status:** validação local concluída e revisões sem achados; pendentes validação manual de desenvolvimento e CI/merge
+**Status:** validação local e manual concluídas; pronta para CI/merge
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)
 **Decisão:** [DEC-015](../DECISION_LOG.md#dec-015-consentimento-interno-versionado-para-publicação-no-desenvolvimento)
 **Depende de:** Task 3A concluída; contrato de publicação e voto já versionado
@@ -155,13 +155,9 @@ script com configuração local validada.
 Pendências que impedem declarar a task integralmente fechada:
 
 1. `GUEST_INVITE_BASE_URL` está configurado localmente como
-   `https://guest.example.com`, um host HTTPS de desenvolvimento/placeholder.
-   Substituí-lo pelo domínio real do Web convidado antes do teste manual; isso
-   não antecipa deploy público.
-2. Teste manual com usuário Google permitido em dispositivo: perfil → prévia →
-   publicação, retry controlado e folha nativa de share/cancelamento. Registrar
-   o resultado sem token/URL de convite em evidências.
-3. Commit/PR e jobs remotos de CI verdes antes de merge. Nesta validação não
+   `https://myelolabs.com.br/eloease/guest-invite` e o share foi validado
+   manualmente.
+2. Commit/PR e jobs remotos de CI verdes antes de merge. Nesta validação não
    houve push, merge, deploy nem aplicação de migration em projeto remoto.
 
 A autorização desta rodada cobriu correções e validações locais. O AGENTS.md

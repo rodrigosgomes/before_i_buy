@@ -77,7 +77,6 @@ jobs:
   mobile-quality:
     name: Mobile lint, tests, and coverage
     needs: repository-contract
-    if: ${{ hashFiles('apps/mobile/pubspec.yaml') != '' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -97,7 +96,6 @@ jobs:
   guest-web-quality:
     name: Guest web lint, tests, and coverage
     needs: repository-contract
-    if: ${{ hashFiles('apps/guest-web/package-lock.json') != '' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -120,7 +118,6 @@ jobs:
     needs:
       - database-policy-tests
       - guest-web-quality
-    if: ${{ hashFiles('apps/guest-web/package-lock.json') != '' }}
     runs-on: ubuntu-latest
     defaults:
       run:
