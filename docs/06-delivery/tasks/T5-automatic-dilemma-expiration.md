@@ -1,6 +1,6 @@
 # Task 5 — expiração automática dos dilemas
 
-**Status:** implementação e gates locais concluídos; aguardando CI remota
+**Status:** concluída no commit `6b0efc2`; CI verde
 **Tipo:** máquina de estados, rotina agendada e segurança temporal
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)
 **Depende de:** [Task 4 — gestão privada de dilemas](T4-creator-dilemma-management.md)
@@ -127,4 +127,7 @@ exclusão.
   separado; cobertura de linhas em 95,85%; integração Flutter/Supabase aprovada.
 - Revisões adversariais de produto, segurança/privacidade e QA concluídas sem
   achados pendentes P0, P1 ou P2.
-- `git diff --check` aprovado. A CI remota será registrada após o push.
+- `git diff --check` aprovado.
+- CI remota: [Quality gates 33984090714](https://github.com/rodrigosgomes/before_i_buy/actions/runs/33984090714)
+  aprovada no commit `6b0efc2`, incluindo contrato do repositório, banco e cron,
+  mobile, guest web e E2E crítico.
