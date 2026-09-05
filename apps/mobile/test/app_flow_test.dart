@@ -705,6 +705,56 @@ void main() {
   });
 
   testWidgets(
+    'dashboard refresh applies decision_due and hides invite actions',
+    (tester) async {
+      final dilemma = CreatorDilemmaSummary(
+        id: uuid,
+        itemName: 'Cadeira Ergonômica',
+        priceCents: 180000,
+        currency: 'BRL',
+        category: ItemCategory.homeLiving,
+        purpose: DraftPurpose.forSelf,
+        reason: 'Melhorar a postura no trabalho diário.',
+        pauseDueAt: DateTime.now().add(const Duration(days: 3)),
+        state: 'collecting_votes',
+        isInviteRevoked: false,
+        createdAt: DateTime.now(),
+        buyCount: 1,
+        waitCount: 0,
+        skipCount: 0,
+        totalVotes: 1,
+      );
+      final gateway = MemoryCreatorDilemmaGateway(initial: [dilemma]);
+      final invites = MemoryActiveInviteRepository();
+      await invites.saveInviteUri(
+        uuid,
+        Uri.parse('https://guest.example.com/invite/token'),
+      );
+
+      await tester.pumpWidget(
+        testApp(
+          auth: FakeAuthGateway(authenticated: true),
+          onboarding: MemoryOnboardingRepository(completeOnboarding),
+          dilemmaGateway: gateway,
+          activeInvites: invites,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.text('Cadeira Ergonômica'));
+      expect(find.text('Compartilhar convite'), findsOneWidget);
+
+      gateway.dilemmas[0] = dilemma.copyWith(state: 'decision_due');
+      await tester.tap(find.byTooltip('Atualizar perspectivas'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pausa concluída · votação encerrada'), findsOneWidget);
+      expect(find.text('Compartilhar convite'), findsNothing);
+      expect(find.text('Revogar convite'), findsNothing);
+      expect(find.text('Total: 1 voto'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'late revocation from account A cannot alter account B or its invite',
     (tester) async {
       final gateway = _SessionSwitchDilemmaGateway(delayRevoke: true);

@@ -403,10 +403,11 @@ void main() {
     });
 
     testWidgets(
-      'expired pause displays closed status and hides share and revoke',
+      'decision_due displays closed status and hides share and revoke',
       (tester) async {
         final expired = _dummyDilemma(
-          pauseDueAt: DateTime.now().subtract(const Duration(hours: 1)),
+          state: 'decision_due',
+          pauseDueAt: DateTime.now().add(const Duration(hours: 1)),
         );
 
         await tester.pumpWidget(
