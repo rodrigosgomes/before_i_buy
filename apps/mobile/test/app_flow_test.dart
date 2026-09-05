@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:before_i_buy_mobile/app.dart';
 import 'package:before_i_buy_mobile/core/app_config.dart';
 import 'package:before_i_buy_mobile/features/auth/auth_gateway.dart';
+import 'package:before_i_buy_mobile/features/creator/active_invite_repository.dart';
 import 'package:before_i_buy_mobile/features/creator/draft.dart';
 import 'package:before_i_buy_mobile/features/creator/draft_repository.dart';
 import 'package:before_i_buy_mobile/features/creator/creator_remote_gateway.dart';
 import 'package:before_i_buy_mobile/features/onboarding/onboarding_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const configured = AppConfig(
   supabaseUrl: 'https://example.supabase.co',
@@ -29,18 +31,22 @@ BeforeIBuyApp testApp({
   required FakeAuthGateway auth,
   MemoryOnboardingRepository? onboarding,
   MemoryDraftRepository? drafts,
+  ActiveInviteRepository? activeInvites,
   AppConfig config = configured,
   TargetPlatform platform = TargetPlatform.android,
   CreatorProfileGateway? profile,
   DilemmaPublicationGateway? publication,
+  CreatorDilemmaGateway? dilemmaGateway,
   InviteShareGateway? share,
 }) => BeforeIBuyApp(
   config: config,
   authGateway: auth,
   onboardingRepository: onboarding ?? MemoryOnboardingRepository(),
   draftRepository: drafts ?? MemoryDraftRepository(),
+  activeInviteRepository: activeInvites ?? MemoryActiveInviteRepository(),
   creatorProfileGateway: profile,
   publicationGateway: publication,
+  dilemmaGateway: dilemmaGateway,
   shareGateway: share,
   createId: () => uuid,
   platform: platform,
@@ -53,6 +59,8 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets('missing configuration fails closed without Auth', (
     tester,
   ) async {
@@ -182,6 +190,10 @@ void main() {
     expect(share.shared, hasLength(1));
     expect(share.shared.single.host, 'guest.example.com');
     expect(share.shared.single.pathSegments.take(1), ['invite']);
+
+    await tapVisible(tester, find.text('Ver painel de acompanhamento'));
+    expect(find.text('Painel do dilema'), findsOneWidget);
+    expect(find.text('Aguardando votos'), findsOneWidget);
   });
 
   testWidgets('Google entry blocks duplicate taps while authenticating', (
@@ -334,6 +346,228 @@ void main() {
     expect(drafts.value?.idempotencyKey, uuid);
     expect(publication.published, isEmpty);
   });
+
+  testWidgets(
+    'dashboard tracking, revocation and hard deletion flow from home',
+    (tester) async {
+      final initialDilemma = CreatorDilemmaSummary(
+        id: uuid,
+        itemName: 'Cadeira Ergonômica',
+        priceCents: 180000,
+        currency: 'BRL',
+        category: ItemCategory.homeLiving,
+        purpose: DraftPurpose.forSelf,
+        reason: 'Melhorar a postura no trabalho diário.',
+        pauseDueAt: DateTime.now().add(const Duration(days: 3)),
+        state: 'collecting_votes',
+        isInviteRevoked: false,
+        createdAt: DateTime.now(),
+        buyCount: 2,
+        waitCount: 1,
+        skipCount: 0,
+        totalVotes: 3,
+      );
+      final dilemmaGateway = MemoryCreatorDilemmaGateway(
+        initial: [initialDilemma],
+      );
+      final activeInvites = MemoryActiveInviteRepository();
+      final inviteUri = Uri.parse('https://guest.example.com/invite/tok123');
+      await activeInvites.saveInviteUri(uuid, inviteUri);
+      final share = MemoryInviteShareGateway();
+
+      await tester.pumpWidget(
+        testApp(
+          auth: FakeAuthGateway(authenticated: true),
+          onboarding: MemoryOnboardingRepository(completeOnboarding),
+          dilemmaGateway: dilemmaGateway,
+          activeInvites: activeInvites,
+          share: share,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Home shows the dilemma card
+      expect(find.text('Suas decisões com espaço'), findsOneWidget);
+      expect(find.text('Cadeira Ergonômica'), findsOneWidget);
+      expect(find.text('R\$ 1.800,00'), findsOneWidget);
+      expect(find.text('Coletando votos · 3 votos'), findsOneWidget);
+
+      // Tap to open dashboard
+      await tapVisible(tester, find.text('Cadeira Ergonômica'));
+      expect(find.text('Painel do dilema'), findsOneWidget);
+      expect(find.text('Perspectivas recebidas'), findsOneWidget);
+      expect(find.text('Total: 3 votos'), findsOneWidget);
+      expect(find.text('Comprar'), findsOneWidget);
+      expect(find.text('2 (67%)'), findsOneWidget);
+
+      // Re-share from dashboard
+      await tapVisible(tester, find.text('Compartilhar convite'));
+      expect(share.shared, [inviteUri]);
+
+      // Revoke invite
+      await tapVisible(tester, find.text('Revogar convite'));
+      expect(find.text('Revogar convite?'), findsOneWidget);
+      await tapVisible(tester, find.text('Revogar'));
+      expect(find.text('Convite revogado · votação encerrada'), findsOneWidget);
+      expect(find.text('Revogar convite'), findsNothing);
+      expect(find.text('Compartilhar convite'), findsNothing);
+      expect(await activeInvites.getInviteUri(uuid), isNull);
+
+      // Delete dilemma
+      await tapVisible(tester, find.text('Apagar dilema'));
+      expect(find.text('Apagar dilema?'), findsOneWidget);
+      await tapVisible(tester, find.text('Apagar definitivamente'));
+
+      // Returns to Home, list is empty so onboarding chapters render
+      expect(find.text('Um pouco de espaço antes de decidir'), findsOneWidget);
+      expect(find.text('Criar minha primeira tentação'), findsOneWidget);
+      expect(await dilemmaGateway.fetchDilemmas(), isEmpty);
+    },
+  );
+
+  testWidgets(
+    'logout during async dashboard open does not leak private dashboard to new session',
+    (tester) async {
+      final initialDilemma = CreatorDilemmaSummary(
+        id: uuid,
+        itemName: 'Cadeira Ergonômica',
+        priceCents: 180000,
+        currency: 'BRL',
+        category: ItemCategory.homeLiving,
+        purpose: DraftPurpose.forSelf,
+        reason: 'Melhorar a postura no trabalho diário.',
+        pauseDueAt: DateTime.now().add(const Duration(days: 3)),
+        state: 'collecting_votes',
+        isInviteRevoked: false,
+        createdAt: DateTime.now(),
+        buyCount: 2,
+        waitCount: 1,
+        skipCount: 0,
+        totalVotes: 3,
+      );
+      final dilemmaGateway = MemoryCreatorDilemmaGateway(
+        initial: [initialDilemma],
+      );
+      final activeInvites = _DelayedActiveInviteRepository();
+      final auth = FakeAuthGateway(authenticated: true);
+
+      await tester.pumpWidget(
+        testApp(
+          auth: auth,
+          onboarding: MemoryOnboardingRepository(completeOnboarding),
+          dilemmaGateway: dilemmaGateway,
+          activeInvites: activeInvites,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cadeira Ergonômica'), findsOneWidget);
+
+      // Tap card: starts _openDashboard and awaits getInviteUri
+      await tester.tap(find.text('Cadeira Ergonômica'));
+      await tester.pump();
+
+      // Sign out during await
+      auth.signOut();
+      await tester.pumpAndSettle();
+
+      // Complete async invite fetch
+      activeInvites.completer.complete(Uri.parse('https://example.com/invite'));
+      await tester.pumpAndSettle();
+
+      // Ensure dashboard is never displayed
+      expect(find.text('Painel do dilema'), findsNothing);
+      expect(find.text('Continuar com Google'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'network failure during post-delete refresh still removes dilemma locally from home',
+    (tester) async {
+      final initialDilemma = CreatorDilemmaSummary(
+        id: uuid,
+        itemName: 'Cadeira Ergonômica',
+        priceCents: 180000,
+        currency: 'BRL',
+        category: ItemCategory.homeLiving,
+        purpose: DraftPurpose.forSelf,
+        reason: 'Melhorar a postura no trabalho diário.',
+        pauseDueAt: DateTime.now().add(const Duration(days: 3)),
+        state: 'collecting_votes',
+        isInviteRevoked: false,
+        createdAt: DateTime.now(),
+        buyCount: 0,
+        waitCount: 0,
+        skipCount: 0,
+        totalVotes: 0,
+      );
+      final dilemmaGateway = _FailingRefreshDilemmaGateway([initialDilemma]);
+
+      await tester.pumpWidget(
+        testApp(
+          auth: FakeAuthGateway(authenticated: true),
+          onboarding: MemoryOnboardingRepository(completeOnboarding),
+          dilemmaGateway: dilemmaGateway,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cadeira Ergonômica'), findsOneWidget);
+
+      // Open dashboard
+      await tapVisible(tester, find.text('Cadeira Ergonômica'));
+      expect(find.text('Painel do dilema'), findsOneWidget);
+
+      // Make next refresh fail
+      dilemmaGateway.failNextFetch = true;
+
+      // Delete dilemma
+      await tapVisible(tester, find.text('Apagar dilema'));
+      await tapVisible(tester, find.text('Apagar definitivamente'));
+
+      // Locally returns to Home with deleted item removed
+      expect(find.text('Cadeira Ergonômica'), findsNothing);
+      expect(find.text('Um pouco de espaço antes de decidir'), findsOneWidget);
+    },
+  );
+}
+
+class _DelayedActiveInviteRepository implements ActiveInviteRepository {
+  final completer = Completer<Uri?>();
+
+  @override
+  Future<Uri?> getInviteUri(String dilemmaId) => completer.future;
+
+  @override
+  Future<void> saveInviteUri(String dilemmaId, Uri inviteUri) async {}
+
+  @override
+  Future<void> removeInviteUri(String dilemmaId) async {}
+}
+
+class _FailingRefreshDilemmaGateway implements CreatorDilemmaGateway {
+  _FailingRefreshDilemmaGateway(this.dilemmas);
+  List<CreatorDilemmaSummary> dilemmas;
+  bool failNextFetch = false;
+
+  @override
+  Future<List<CreatorDilemmaSummary>> fetchDilemmas() async {
+    if (failNextFetch) throw StateError('simulated network failure');
+    return dilemmas;
+  }
+
+  @override
+  Future<void> revokeInvite(String dilemmaId) async {
+    dilemmas = [
+      for (final d in dilemmas)
+        if (d.id == dilemmaId) d.copyWith(isInviteRevoked: true) else d,
+    ];
+  }
+
+  @override
+  Future<void> deleteDilemma(String dilemmaId) async {
+    dilemmas = dilemmas.where((d) => d.id != dilemmaId).toList();
+  }
 }
 
 class _DelayedAuthGateway extends FakeAuthGateway {

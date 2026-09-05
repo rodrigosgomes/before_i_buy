@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:before_i_buy_mobile/features/creator/active_invite_repository.dart';
 import 'package:before_i_buy_mobile/features/creator/draft.dart';
 import 'package:before_i_buy_mobile/features/creator/draft_repository.dart';
 import 'package:before_i_buy_mobile/features/onboarding/onboarding_repository.dart';
@@ -122,4 +123,74 @@ void main() {
     expect(drafts.saveCount, 1);
     expect(onboarding.saveCount, 1);
   });
+
+  test(
+    'active invite repository saves, restores and removes invite URIs',
+    () async {
+      final repository = SharedPreferencesActiveInviteRepository(
+        userId: 'test-user',
+      );
+      final uri = Uri.parse('https://guest.example.com/invite/tok123');
+      await repository.saveInviteUri('dilemma-1', uri);
+
+      final restored = await repository.getInviteUri('dilemma-1');
+      expect(restored, uri);
+
+      // Other user cannot see this invite
+      final otherRepo = SharedPreferencesActiveInviteRepository(
+        userId: 'other-user',
+      );
+      expect(await otherRepo.getInviteUri('dilemma-1'), isNull);
+
+      // Remove
+      await repository.removeInviteUri('dilemma-1');
+      expect(await repository.getInviteUri('dilemma-1'), isNull);
+    },
+  );
+
+  test(
+    'active invite repository reports save and removal failures with StateError',
+    () async {
+      final repository = SharedPreferencesActiveInviteRepository(
+        userId: 'test-user',
+        preferences: Future.value(_RejectedPreferences()),
+      );
+      final uri = Uri.parse('https://guest.example.com/invite/tok123');
+
+      await expectLater(
+        repository.saveInviteUri('dilemma-1', uri),
+        throwsStateError,
+      );
+      await expectLater(
+        repository.removeInviteUri('dilemma-1'),
+        throwsStateError,
+      );
+    },
+  );
+
+  test('memory active invite repository works in-memory', () async {
+    final repo = MemoryActiveInviteRepository();
+    final uri = Uri.parse('https://guest.example.com/invite/tok456');
+    await repo.saveInviteUri('dilemma-2', uri);
+    expect(await repo.getInviteUri('dilemma-2'), uri);
+    await repo.removeInviteUri('dilemma-2');
+    expect(await repo.getInviteUri('dilemma-2'), isNull);
+  });
+}
+
+class _RejectedPreferences implements SharedPreferences {
+  @override
+  bool containsKey(String key) => true;
+
+  @override
+  String? getString(String key) => null;
+
+  @override
+  Future<bool> setString(String key, String value) async => false;
+
+  @override
+  Future<bool> remove(String key) async => false;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -14,6 +14,7 @@ Future<void> main() async {
   CreatorProfileGateway creatorProfileGateway = MemoryCreatorProfileGateway();
   DilemmaPublicationGateway publicationGateway =
       MemoryDilemmaPublicationGateway();
+  CreatorDilemmaGateway dilemmaGateway = MemoryCreatorDilemmaGateway();
   if (config.hasSupabaseConfiguration) {
     await Supabase.initialize(
       url: config.supabaseUrl,
@@ -32,6 +33,7 @@ Future<void> main() async {
     publicationGateway = SupabaseDilemmaPublicationGateway(
       Supabase.instance.client,
     );
+    dilemmaGateway = SupabaseCreatorDilemmaGateway(Supabase.instance.client);
   }
   runApp(
     BeforeIBuyApp(
@@ -39,6 +41,7 @@ Future<void> main() async {
       authGateway: authGateway,
       creatorProfileGateway: creatorProfileGateway,
       publicationGateway: publicationGateway,
+      dilemmaGateway: dilemmaGateway,
       shareGateway: SharePlusInviteShareGateway(),
     ),
   );

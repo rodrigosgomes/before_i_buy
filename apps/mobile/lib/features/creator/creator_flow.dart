@@ -2,53 +2,163 @@ import 'package:flutter/material.dart';
 
 import '../../design_system/bib_components.dart';
 import '../../design_system/bib_theme.dart';
+import 'creator_remote_gateway.dart';
 import 'draft.dart';
 
 class CreatorHomeScreen extends StatelessWidget {
-  const CreatorHomeScreen({super.key, required this.onCreate});
+  const CreatorHomeScreen({
+    super.key,
+    required this.onCreate,
+    this.dilemmas = const [],
+    this.onSelectDilemma,
+  });
 
   final VoidCallback onCreate;
+  final List<CreatorDilemmaSummary> dilemmas;
+  final ValueChanged<CreatorDilemmaSummary>? onSelectDilemma;
 
   @override
-  Widget build(BuildContext context) => BibPageShell(
-    scrollable: false,
-    bottom: BibPrimaryButton(
-      label: 'Criar minha primeira tentação',
-      onPressed: onCreate,
-    ),
-    child: LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+  Widget build(BuildContext context) {
+    if (dilemmas.isNotEmpty) {
+      return BibPageShell(
+        bottom: BibPrimaryButton(
+          label: 'Criar nova tentação',
+          onPressed: onCreate,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Suas decisões com espaço',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: BibSpacing.x2),
+            const Text(
+              'Acompanhe os votos recebidos ou revogue o acesso quando quiser.',
+            ),
+            const SizedBox(height: BibSpacing.x5),
+            ...dilemmas.map(
+              (dilemma) => _DilemmaCard(
+                dilemma: dilemma,
+                onTap: () => onSelectDilemma?.call(dilemma),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return BibPageShell(
+      scrollable: false,
+      bottom: BibPrimaryButton(
+        label: 'Criar minha primeira tentação',
+        onPressed: onCreate,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 56,
+                  color: Theme.of(context).colorScheme.primary,
+                  semanticLabel: 'Conversa privada',
+                ),
+                const SizedBox(height: BibSpacing.x5),
+                Text(
+                  'Um pouco de espaço antes de decidir',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: BibSpacing.x3),
+                const Text(
+                  'Organize a vontade, peça perspectiva a pessoas próximas e escolha no seu tempo.',
+                ),
+                const SizedBox(height: BibSpacing.x6),
+                const _Chapter(number: '1', label: 'Conte o que está pensando'),
+                const _Chapter(number: '2', label: 'Ouça perspectivas'),
+                const _Chapter(number: '3', label: 'Decida você'),
+                const SizedBox(height: BibSpacing.x6),
+                const BibPrivacyNotice(
+                  title: 'Seu espaço é privado',
+                  body:
+                      'Seus dilemas só abrirão para quem receber um link em uma etapa futura.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DilemmaCard extends StatelessWidget {
+  const _DilemmaCard({required this.dilemma, required this.onTap});
+
+  final CreatorDilemmaSummary dilemma;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label:
+        'Dilema ${dilemma.itemName}, ${centsToBrl(dilemma.priceCents)}, ${dilemma.isInviteRevoked ? "convite revogado" : "${dilemma.totalVotes} votos"}',
+    child: Card(
+      margin: const EdgeInsets.only(bottom: BibSpacing.x4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(BibRadii.card),
+        side: const BorderSide(color: BibColors.outline),
+      ),
+      elevation: 0,
+      color: BibColors.surface,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(BibRadii.card),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(BibSpacing.x4),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.chat_bubble_outline_rounded,
-                size: 56,
-                color: Theme.of(context).colorScheme.primary,
-                semanticLabel: 'Conversa privada',
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      dilemma.itemName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: BibSpacing.x2),
+                  Text(
+                    centsToBrl(dilemma.priceCents),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ],
               ),
-              const SizedBox(height: BibSpacing.x5),
-              Text(
-                'Um pouco de espaço antes de decidir',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: BibSpacing.x3),
-              const Text(
-                'Organize a vontade, peça perspectiva a pessoas próximas e escolha no seu tempo.',
-              ),
-              const SizedBox(height: BibSpacing.x6),
-              const _Chapter(number: '1', label: 'Conte o que está pensando'),
-              const _Chapter(number: '2', label: 'Ouça perspectivas'),
-              const _Chapter(number: '3', label: 'Decida você'),
-              const SizedBox(height: BibSpacing.x6),
-              const BibPrivacyNotice(
-                title: 'Seu espaço é privado',
-                body:
-                    'Seus dilemas só abrirão para quem receber um link em uma etapa futura.',
-              ),
+              const SizedBox(height: BibSpacing.x2),
+              if (dilemma.isInviteRevoked)
+                const BibStatusChip(
+                  label: 'Convite revogado',
+                  icon: Icons.block_rounded,
+                )
+              else if (!dilemma.isVotingOpen)
+                const BibStatusChip(
+                  label: 'Pausa concluída · votação encerrada',
+                  icon: Icons.timer_off_outlined,
+                )
+              else
+                BibStatusChip(
+                  label: dilemma.totalVotes == 0
+                      ? 'Coletando votos · aguardando respostas'
+                      : 'Coletando votos · ${dilemma.totalVotes} ${dilemma.totalVotes == 1 ? "voto" : "votos"}',
+                  icon: Icons.how_to_vote_outlined,
+                ),
             ],
           ),
         ),
@@ -373,10 +483,12 @@ class PublishedDilemmaScreen extends StatefulWidget {
     super.key,
     required this.draft,
     required this.onShare,
+    this.onGoToDashboard,
   });
 
   final DraftDilemma draft;
   final Future<String?> Function() onShare;
+  final VoidCallback? onGoToDashboard;
 
   @override
   State<PublishedDilemmaScreen> createState() => _PublishedDilemmaScreenState();
@@ -437,7 +549,328 @@ class _PublishedDilemmaScreenState extends State<PublishedDilemmaScreen> {
           loading: _sharing,
           onPressed: _sharing ? null : _share,
         ),
+        if (widget.onGoToDashboard != null) ...[
+          const SizedBox(height: BibSpacing.x3),
+          BibSecondaryButton(
+            label: 'Ver painel de acompanhamento',
+            onPressed: _sharing ? null : widget.onGoToDashboard,
+          ),
+        ],
       ],
     ),
+  );
+}
+
+class DilemmaDashboardScreen extends StatefulWidget {
+  const DilemmaDashboardScreen({
+    super.key,
+    required this.dilemma,
+    required this.onBack,
+    this.onShare,
+    required this.onRevoke,
+    required this.onDelete,
+    this.onRefresh,
+  });
+
+  final CreatorDilemmaSummary dilemma;
+  final VoidCallback onBack;
+  final Future<String?> Function()? onShare;
+  final Future<String?> Function() onRevoke;
+  final Future<String?> Function() onDelete;
+  final Future<void> Function()? onRefresh;
+
+  @override
+  State<DilemmaDashboardScreen> createState() => _DilemmaDashboardScreenState();
+}
+
+class _DilemmaDashboardScreenState extends State<DilemmaDashboardScreen> {
+  var _revoking = false;
+  var _deleting = false;
+  var _sharing = false;
+  String? _error;
+
+  Future<void> _handleShare() async {
+    if (widget.onShare == null) return;
+    setState(() {
+      _sharing = true;
+      _error = null;
+    });
+    final error = await widget.onShare!();
+    if (!mounted) return;
+    setState(() {
+      _sharing = false;
+      _error = error;
+    });
+  }
+
+  Future<void> _confirmRevocation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Revogar convite?'),
+        content: const Text(
+          'O link deixará de funcionar imediatamente para qualquer pessoa. Ninguém mais poderá votar. Os votos já recebidos continuarão visíveis para você.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Manter convite'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Revogar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _revoking = true;
+      _error = null;
+    });
+    final error = await widget.onRevoke();
+    if (!mounted) return;
+    setState(() {
+      _revoking = false;
+      _error = error;
+    });
+  }
+
+  Future<void> _confirmDeletion() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Apagar dilema?'),
+        content: const Text(
+          'Esta ação é definitiva e removerá este dilema, o link de convite e todos os votos registrados.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Apagar definitivamente'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+    final error = await widget.onDelete();
+    if (!mounted) return;
+    setState(() {
+      _deleting = false;
+      _error = error;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dilemma = widget.dilemma;
+    return BibPageShell(
+      topBar: BibTopBar(
+        title: 'Painel do dilema',
+        onBack: widget.onBack,
+        actions: [
+          if (widget.onRefresh != null)
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Atualizar perspectivas',
+              onPressed: widget.onRefresh,
+            ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (dilemma.isInviteRevoked)
+            const BibStatusChip(
+              label: 'Convite revogado · votação encerrada',
+              icon: Icons.block_rounded,
+            )
+          else if (!dilemma.isVotingOpen)
+            const BibStatusChip(
+              label: 'Pausa concluída · votação encerrada',
+              icon: Icons.timer_off_outlined,
+            )
+          else
+            const BibStatusChip(
+              label: 'Coletando votos de amigos',
+              icon: Icons.how_to_vote_outlined,
+            ),
+          const SizedBox(height: BibSpacing.x4),
+          Text(
+            dilemma.itemName,
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          const SizedBox(height: BibSpacing.x1),
+          Text(
+            centsToBrl(dilemma.priceCents),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: BibSpacing.x4),
+          Text(dilemma.reason),
+          const SizedBox(height: BibSpacing.x5),
+          const Divider(),
+          const SizedBox(height: BibSpacing.x5),
+          Text(
+            'Perspectivas recebidas',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: BibSpacing.x3),
+          if (dilemma.totalVotes == 0) ...[
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: BibColors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(BibRadii.card),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(BibSpacing.x4),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.hourglass_empty_rounded,
+                        size: 36,
+                        color: BibColors.textSecondary,
+                      ),
+                      SizedBox(height: BibSpacing.x2),
+                      Text(
+                        'Aguardando votos',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: BibSpacing.x1),
+                      Text(
+                        'Compartilhe o convite com pessoas próximas para receber perspectivas sinceras.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            Text(
+              'Total: ${dilemma.totalVotes} ${dilemma.totalVotes == 1 ? "voto" : "votos"}',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: BibSpacing.x3),
+            _VoteDistributionBar(
+              label: 'Comprar',
+              count: dilemma.buyCount,
+              percentage: dilemma.buyPercentage,
+            ),
+            const SizedBox(height: BibSpacing.x3),
+            _VoteDistributionBar(
+              label: 'Esperar',
+              count: dilemma.waitCount,
+              percentage: dilemma.waitPercentage,
+            ),
+            const SizedBox(height: BibSpacing.x3),
+            _VoteDistributionBar(
+              label: 'Deixar pra lá',
+              count: dilemma.skipCount,
+              percentage: dilemma.skipPercentage,
+            ),
+            const SizedBox(height: BibSpacing.x4),
+            const BibPrivacyNotice(
+              title: 'Privacidade garantida',
+              body:
+                  'A distribuição é anônima. Nenhuma resposta individual é identificada.',
+            ),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: BibSpacing.x4),
+            BibInlineMessage(message: _error!, kind: BibMessageKind.error),
+          ],
+          const SizedBox(height: BibSpacing.x6),
+          if (dilemma.isVotingOpen && widget.onShare != null) ...[
+            BibPrimaryButton(
+              label: 'Compartilhar convite',
+              loading: _sharing,
+              onPressed: _sharing || _revoking || _deleting
+                  ? null
+                  : _handleShare,
+            ),
+            const SizedBox(height: BibSpacing.x3),
+          ],
+          if (dilemma.isVotingOpen) ...[
+            BibSecondaryButton(
+              label: 'Revogar convite',
+              loading: _revoking,
+              onPressed: _sharing || _revoking || _deleting
+                  ? null
+                  : _confirmRevocation,
+            ),
+            const SizedBox(height: BibSpacing.x3),
+          ],
+          BibDestructiveButton(
+            label: 'Apagar dilema',
+            loading: _deleting,
+            onPressed: _sharing || _revoking || _deleting
+                ? null
+                : _confirmDeletion,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VoteDistributionBar extends StatelessWidget {
+  const _VoteDistributionBar({
+    required this.label,
+    required this.count,
+    required this.percentage,
+  });
+
+  final String label;
+  final int count;
+  final double percentage;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: BibSpacing.x2),
+          Text(
+            '$count (${percentage.toStringAsFixed(0)}%)',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
+      const SizedBox(height: BibSpacing.x1),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(BibRadii.button),
+        child: LinearProgressIndicator(
+          value: percentage > 0 ? (percentage / 100).clamp(0.0, 1.0) : 0.0,
+          minHeight: 12,
+        ),
+      ),
+    ],
   );
 }

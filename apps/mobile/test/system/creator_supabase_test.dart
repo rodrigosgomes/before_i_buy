@@ -117,6 +117,27 @@ void main() {
         expect((voted as List).single['total_votes'], 1);
         await repository.clear();
         expect(await repository.load(), isNull);
+
+        // Exercise SupabaseCreatorDilemmaGateway against real RPCs
+        final dilemmaGateway = SupabaseCreatorDilemmaGateway(creator);
+        final dilemmas = await dilemmaGateway.fetchDilemmas();
+        expect(dilemmas, hasLength(1));
+        final created = dilemmas.single;
+        expect(created.id, retry.dilemmaId);
+        expect(created.itemName, 'Fone de teste');
+        expect(created.waitCount, 1);
+        expect(created.totalVotes, 1);
+        expect(created.isInviteRevoked, isFalse);
+
+        // Revoke invite
+        await dilemmaGateway.revokeInvite(retry.dilemmaId);
+        final afterRevoke = await dilemmaGateway.fetchDilemmas();
+        expect(afterRevoke.single.isInviteRevoked, isTrue);
+
+        // Hard delete dilemma (LGPD)
+        await dilemmaGateway.deleteDilemma(retry.dilemmaId);
+        final afterDelete = await dilemmaGateway.fetchDilemmas();
+        expect(afterDelete, isEmpty);
       } finally {
         if (userId != null) await admin.auth.admin.deleteUser(userId);
         await creator.dispose();

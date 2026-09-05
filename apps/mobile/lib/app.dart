@@ -12,6 +12,7 @@ import 'features/auth/google_sign_in_screen.dart';
 import 'features/creator/creator_flow.dart';
 import 'features/creator/creator_remote_gateway.dart';
 import 'features/creator/draft.dart';
+import 'features/creator/active_invite_repository.dart';
 import 'features/creator/draft_repository.dart';
 import 'features/onboarding/onboarding_repository.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -23,8 +24,10 @@ class BeforeIBuyApp extends StatelessWidget {
     this.authGateway,
     this.onboardingRepository,
     this.draftRepository,
+    this.activeInviteRepository,
     CreatorProfileGateway? creatorProfileGateway,
     DilemmaPublicationGateway? publicationGateway,
+    CreatorDilemmaGateway? dilemmaGateway,
     InviteShareGateway? shareGateway,
     String Function()? createId,
     TargetPlatform? platform,
@@ -32,6 +35,7 @@ class BeforeIBuyApp extends StatelessWidget {
            creatorProfileGateway ?? MemoryCreatorProfileGateway(),
        publicationGateway =
            publicationGateway ?? MemoryDilemmaPublicationGateway(),
+       dilemmaGateway = dilemmaGateway ?? MemoryCreatorDilemmaGateway(),
        shareGateway = shareGateway ?? MemoryInviteShareGateway(),
        createId = createId ?? const Uuid().v4,
        platform = platform ?? defaultTargetPlatform;
@@ -40,8 +44,10 @@ class BeforeIBuyApp extends StatelessWidget {
   final AuthGateway? authGateway;
   final OnboardingRepository? onboardingRepository;
   final DraftRepository? draftRepository;
+  final ActiveInviteRepository? activeInviteRepository;
   final CreatorProfileGateway creatorProfileGateway;
   final DilemmaPublicationGateway publicationGateway;
+  final CreatorDilemmaGateway dilemmaGateway;
   final InviteShareGateway shareGateway;
   final String Function() createId;
   final TargetPlatform platform;
@@ -56,8 +62,10 @@ class BeforeIBuyApp extends StatelessWidget {
       authGateway: authGateway,
       onboardingRepository: onboardingRepository,
       draftRepository: draftRepository,
+      activeInviteRepository: activeInviteRepository,
       creatorProfileGateway: creatorProfileGateway,
       publicationGateway: publicationGateway,
+      dilemmaGateway: dilemmaGateway,
       shareGateway: shareGateway,
       createId: createId,
       platform: platform,
@@ -76,6 +84,7 @@ enum AppStage {
   review,
   preview,
   published,
+  dashboard,
 }
 
 class AppFlow extends StatefulWidget {
@@ -85,8 +94,10 @@ class AppFlow extends StatefulWidget {
     required this.authGateway,
     required this.onboardingRepository,
     required this.draftRepository,
+    this.activeInviteRepository,
     required this.creatorProfileGateway,
     required this.publicationGateway,
+    required this.dilemmaGateway,
     required this.shareGateway,
     required this.createId,
     required this.platform,
@@ -96,8 +107,10 @@ class AppFlow extends StatefulWidget {
   final AuthGateway? authGateway;
   final OnboardingRepository? onboardingRepository;
   final DraftRepository? draftRepository;
+  final ActiveInviteRepository? activeInviteRepository;
   final CreatorProfileGateway creatorProfileGateway;
   final DilemmaPublicationGateway publicationGateway;
+  final CreatorDilemmaGateway dilemmaGateway;
   final InviteShareGateway shareGateway;
   final String Function() createId;
   final TargetPlatform platform;
@@ -113,7 +126,11 @@ class _AppFlowState extends State<AppFlow> {
   DraftDilemma? _draft;
   bool _recoveredDraft = false;
   DraftDilemma? _publishedDraft;
+  String? _publishedDilemmaId;
   Uri? _publishedInviteUri;
+  List<CreatorDilemmaSummary> _dilemmas = const [];
+  CreatorDilemmaSummary? _selectedDilemma;
+  Uri? _activeInviteUri;
   String? _userId;
   int _sessionGeneration = 0;
   Future<void> _draftWrites = Future.value();
@@ -126,6 +143,9 @@ class _AppFlowState extends State<AppFlow> {
   DraftRepository get _draftRepository =>
       widget.draftRepository ??
       SharedPreferencesDraftRepository(userId: _userId!);
+  ActiveInviteRepository get _activeInviteRepository =>
+      widget.activeInviteRepository ??
+      SharedPreferencesActiveInviteRepository(userId: _userId!);
 
   bool _isCurrent(int generation) =>
       mounted &&
@@ -141,7 +161,11 @@ class _AppFlowState extends State<AppFlow> {
     _onboarding = null;
     _draft = null;
     _publishedDraft = null;
+    _publishedDilemmaId = null;
     _publishedInviteUri = null;
+    _dilemmas = const [];
+    _selectedDilemma = null;
+    _activeInviteUri = null;
     _publishing = false;
     _draftWriteError = null;
     _draftWrites = Future.value();
@@ -208,6 +232,16 @@ class _AppFlowState extends State<AppFlow> {
           ? AppStage.profileSync
           : AppStage.home,
     );
+    if (profileStatus == CreatorProfileStatus.needsSync) {
+      setState(() => _stage = AppStage.profileSync);
+      return;
+    }
+    final dilemmas = await widget.dilemmaGateway.fetchDilemmas();
+    if (!_isCurrent(generation)) return;
+    setState(() {
+      _dilemmas = dilemmas;
+      _stage = AppStage.home;
+    });
   }
 
   Future<void> _completeOnboarding(LocalOnboarding onboarding) async {
@@ -239,6 +273,16 @@ class _AppFlowState extends State<AppFlow> {
       final draft = await repository.load();
       if (!_isCurrent(generation)) return null;
       _showDraft(draft);
+      if (draft != null) {
+        _showDraft(draft);
+        return null;
+      }
+      final dilemmas = await widget.dilemmaGateway.fetchDilemmas();
+      if (!_isCurrent(generation)) return null;
+      setState(() {
+        _dilemmas = dilemmas;
+        _stage = AppStage.home;
+      });
       return null;
     } catch (_) {
       return 'Não foi possível salvar seu perfil agora. Tente novamente.';
@@ -295,11 +339,23 @@ class _AppFlowState extends State<AppFlow> {
       final inviteUri = GuestInviteLinkBuilder(
         widget.config.guestInviteBaseUri,
       ).build(published.inviteToken);
+      await _activeInviteRepository.saveInviteUri(
+        published.dilemmaId,
+        inviteUri,
+      );
       await repository.clear();
+      List<CreatorDilemmaSummary> updatedDilemmas = _dilemmas;
+      try {
+        updatedDilemmas = await widget.dilemmaGateway.fetchDilemmas();
+      } catch (_) {
+        // Best-effort sync; publication and active invite retention already succeeded.
+      }
       if (!_isCurrent(generation)) return null;
       setState(() {
         _publishedDraft = draft;
+        _publishedDilemmaId = published.dilemmaId;
         _publishedInviteUri = inviteUri;
+        _dilemmas = updatedDilemmas;
         _draft = null;
         _recoveredDraft = false;
         _stage = AppStage.published;
@@ -311,6 +367,86 @@ class _AppFlowState extends State<AppFlow> {
           : 'Não foi possível salvar neste aparelho. Tente novamente.';
     } finally {
       if (_isCurrent(generation)) _publishing = false;
+    }
+  }
+
+  Future<void> _refreshDilemmas() async {
+    final generation = _sessionGeneration;
+    try {
+      final dilemmas = await widget.dilemmaGateway.fetchDilemmas();
+      if (!_isCurrent(generation)) return;
+      setState(() {
+        _dilemmas = dilemmas;
+        if (_selectedDilemma != null) {
+          _selectedDilemma = dilemmas.firstWhere(
+            (d) => d.id == _selectedDilemma!.id,
+            orElse: () => _selectedDilemma!,
+          );
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _openDashboard(CreatorDilemmaSummary dilemma) async {
+    final generation = _sessionGeneration;
+    final inviteUri = await _activeInviteRepository.getInviteUri(dilemma.id);
+    if (!_isCurrent(generation)) return;
+    setState(() {
+      _selectedDilemma = dilemma;
+      _activeInviteUri = inviteUri;
+      _stage = AppStage.dashboard;
+    });
+  }
+
+  Future<String?> _revokeInvite(String dilemmaId) async {
+    final generation = _sessionGeneration;
+    try {
+      await widget.dilemmaGateway.revokeInvite(dilemmaId);
+      await _activeInviteRepository.removeInviteUri(dilemmaId);
+      if (!_isCurrent(generation)) return null;
+      setState(() {
+        _activeInviteUri = null;
+        _dilemmas = [
+          for (final d in _dilemmas)
+            if (d.id == dilemmaId) d.copyWith(isInviteRevoked: true) else d,
+        ];
+        if (_selectedDilemma?.id == dilemmaId) {
+          _selectedDilemma = _selectedDilemma!.copyWith(isInviteRevoked: true);
+        }
+      });
+      await _refreshDilemmas();
+      return null;
+    } catch (_) {
+      return 'Não foi possível revogar o convite agora.';
+    }
+  }
+
+  Future<String?> _deleteDilemma(String dilemmaId) async {
+    final generation = _sessionGeneration;
+    try {
+      await widget.dilemmaGateway.deleteDilemma(dilemmaId);
+      await _activeInviteRepository.removeInviteUri(dilemmaId);
+      if (!_isCurrent(generation)) return null;
+      setState(() {
+        _dilemmas = _dilemmas.where((d) => d.id != dilemmaId).toList();
+        _selectedDilemma = null;
+        _activeInviteUri = null;
+        _stage = AppStage.home;
+      });
+      await _refreshDilemmas();
+      return null;
+    } catch (_) {
+      return 'Não foi possível apagar o dilema agora.';
+    }
+  }
+
+  Future<String?> _shareFromDashboard() async {
+    if (_activeInviteUri == null) return null;
+    try {
+      await widget.shareGateway.share(_activeInviteUri!);
+      return null;
+    } catch (_) {
+      return 'Não foi possível abrir o compartilhamento agora.';
     }
   }
 
@@ -346,7 +482,11 @@ class _AppFlowState extends State<AppFlow> {
       onComplete: _completeOnboarding,
     ),
     AppStage.profileSync => RemoteProfileSyncScreen(onSync: _syncProfile),
-    AppStage.home => CreatorHomeScreen(onCreate: _createDraft),
+    AppStage.home => CreatorHomeScreen(
+      onCreate: _createDraft,
+      dilemmas: _dilemmas,
+      onSelectDilemma: _openDashboard,
+    ),
     AppStage.draft => DraftScreen(
       draft: _draft!,
       recovered: _recoveredDraft,
@@ -373,6 +513,39 @@ class _AppFlowState extends State<AppFlow> {
     AppStage.published => PublishedDilemmaScreen(
       draft: _publishedDraft!,
       onShare: _share,
+      onGoToDashboard: () {
+        final dilemma = _dilemmas.firstWhere(
+          (d) => d.id == _publishedDilemmaId,
+          orElse: () => CreatorDilemmaSummary(
+            id: _publishedDilemmaId ?? '',
+            itemName: _publishedDraft!.itemName,
+            priceCents: _publishedDraft!.priceCents,
+            currency: 'BRL',
+            category: _publishedDraft!.category,
+            purpose: _publishedDraft!.purpose,
+            reason: _publishedDraft!.reason,
+            pauseDueAt: DateTime.now().add(
+              Duration(hours: _publishedDraft!.pauseHours),
+            ),
+            state: 'collecting_votes',
+            isInviteRevoked: false,
+            createdAt: DateTime.now(),
+            buyCount: 0,
+            waitCount: 0,
+            skipCount: 0,
+            totalVotes: 0,
+          ),
+        );
+        _openDashboard(dilemma);
+      },
+    ),
+    AppStage.dashboard => DilemmaDashboardScreen(
+      dilemma: _selectedDilemma!,
+      onBack: () => setState(() => _stage = AppStage.home),
+      onShare: _activeInviteUri == null ? null : _shareFromDashboard,
+      onRevoke: () => _revokeInvite(_selectedDilemma!.id),
+      onDelete: () => _deleteDilemma(_selectedDilemma!.id),
+      onRefresh: _refreshDilemmas,
     ),
   };
 }

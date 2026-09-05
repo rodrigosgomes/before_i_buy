@@ -161,4 +161,145 @@ void main() {
       await gateway.sync(profile);
     },
   );
+
+  test('creator dilemma summary parses row with vote aggregates', () {
+    final now = DateTime.now().toUtc();
+    final row = {
+      'dilemma_id': id,
+      'item_name': 'Monitor 4K',
+      'price_cents': 350000,
+      'currency': 'BRL',
+      'category': 'electronics',
+      'purpose': 'for_work',
+      'reason': 'Mais produtividade no trabalho.',
+      'pause_due_at': now.toIso8601String(),
+      'state': 'collecting_votes',
+      'is_invite_revoked': false,
+      'created_at': now.toIso8601String(),
+      'buy_count': 3,
+      'wait_count': 2,
+      'skip_count': 1,
+      'total_votes': 6,
+    };
+    final summary = CreatorDilemmaSummary.fromJson(row);
+    expect(summary.id, id);
+    expect(summary.itemName, 'Monitor 4K');
+    expect(summary.priceCents, 350000);
+    expect(summary.totalVotes, 6);
+    expect(summary.buyCount, 3);
+    expect(summary.waitCount, 2);
+    expect(summary.skipCount, 1);
+    expect(summary.buyPercentage, closeTo(50.0, 0.01));
+    expect(summary.isInviteRevoked, isFalse);
+  });
+
+  test(
+    'dilemma gateway calls get_creator_dilemmas and parses summaries',
+    () async {
+      final now = DateTime.now().toUtc();
+      final gateway = SupabaseCreatorDilemmaGateway(
+        client((request) async {
+          expect(request.url.path, '/rest/v1/rpc/get_creator_dilemmas');
+          return http.Response(
+            jsonEncode([
+              {
+                'dilemma_id': id,
+                'item_name': 'Monitor 4K',
+                'price_cents': 350000,
+                'currency': 'BRL',
+                'category': 'other',
+                'purpose': 'for_self',
+                'reason': 'Trabalho',
+                'pause_due_at': now.toIso8601String(),
+                'state': 'collecting_votes',
+                'is_invite_revoked': false,
+                'created_at': now.toIso8601String(),
+                'buy_count': 0,
+                'wait_count': 0,
+                'skip_count': 0,
+                'total_votes': 0,
+              },
+            ]),
+            200,
+          );
+        }),
+      );
+
+      final list = await gateway.fetchDilemmas();
+      expect(list, hasLength(1));
+      expect(list.single.id, id);
+      expect(list.single.itemName, 'Monitor 4K');
+    },
+  );
+
+  test(
+    'dilemma gateway returns empty list on malformed or non-list response',
+    () async {
+      final gateway = SupabaseCreatorDilemmaGateway(
+        client((_) async => http.Response('{"error": "bad"}', 200)),
+      );
+      final list = await gateway.fetchDilemmas();
+      expect(list, isEmpty);
+    },
+  );
+
+  test('dilemma gateway calls revoke_dilemma_invite RPC', () async {
+    final gateway = SupabaseCreatorDilemmaGateway(
+      client((request) async {
+        expect(request.url.path, '/rest/v1/rpc/revoke_dilemma_invite');
+        expect(jsonDecode(request.body), {'p_dilemma_id': id});
+        return http.Response('null', 200);
+      }),
+    );
+    await gateway.revokeInvite(id);
+  });
+
+  test('dilemma gateway calls delete_creator_dilemma RPC', () async {
+    final gateway = SupabaseCreatorDilemmaGateway(
+      client((request) async {
+        expect(request.url.path, '/rest/v1/rpc/delete_creator_dilemma');
+        expect(jsonDecode(request.body), {'p_dilemma_id': id});
+        return http.Response('null', 200);
+      }),
+    );
+    await gateway.deleteDilemma(id);
+  });
+
+  test(
+    'memory creator dilemma gateway supports list, revoke, and delete',
+    () async {
+      final initial = CreatorDilemmaSummary(
+        id: id,
+        itemName: 'Livro',
+        priceCents: 5000,
+        currency: 'BRL',
+        category: ItemCategory.other,
+        purpose: DraftPurpose.forSelf,
+        reason: 'Estudo',
+        pauseDueAt: DateTime.now(),
+        state: 'collecting_votes',
+        isInviteRevoked: false,
+        createdAt: DateTime.now(),
+        buyCount: 1,
+        waitCount: 0,
+        skipCount: 0,
+        totalVotes: 1,
+      );
+      final memoryGateway = MemoryCreatorDilemmaGateway(initial: [initial]);
+
+      expect(
+        (await memoryGateway.fetchDilemmas()).single.isInviteRevoked,
+        isFalse,
+      );
+
+      await memoryGateway.revokeInvite(id);
+      expect(
+        (await memoryGateway.fetchDilemmas()).single.isInviteRevoked,
+        isTrue,
+      );
+
+      await memoryGateway.deleteDilemma(id);
+      expect(await memoryGateway.fetchDilemmas(), isEmpty);
+    },
+  );
 }

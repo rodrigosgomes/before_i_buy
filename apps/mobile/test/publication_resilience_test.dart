@@ -37,6 +37,7 @@ BeforeIBuyApp app(
   DilemmaPublicationGateway? publication,
   InviteShareGateway? share,
   DraftRepository? drafts,
+  CreatorDilemmaGateway? dilemmaGateway,
 }) => BeforeIBuyApp(
   config: configured,
   authGateway: auth,
@@ -44,6 +45,7 @@ BeforeIBuyApp app(
   publicationGateway: publication,
   shareGateway: share,
   draftRepository: drafts,
+  dilemmaGateway: dilemmaGateway,
 );
 
 Future<void> preview(WidgetTester tester) async {
@@ -302,6 +304,24 @@ void main() {
       expect(find.textContaining('sensitive error'), findsNothing);
     },
   );
+
+  testWidgets(
+    'failed dilemma sync after successful publish transitions to published and preserves invite',
+    (tester) async {
+      await seed('test-user');
+      final auth = FakeAuthGateway(authenticated: true);
+      final publication = MemoryDilemmaPublicationGateway();
+      final failingDilemmas = _FailingDilemmaGateway();
+      await tester.pumpWidget(
+        app(auth, publication: publication, dilemmaGateway: failingDilemmas),
+      );
+      await preview(tester);
+      await tapVisible(tester, find.text('Publicar convite privado'));
+      expect(find.text('Compartilhar convite'), findsOneWidget);
+      expect(find.textContaining('Não recebemos a confirmação'), findsNothing);
+      expect(publication.published, hasLength(1));
+    },
+  );
 }
 
 class DelayedPublication implements DilemmaPublicationGateway {
@@ -337,4 +357,16 @@ class RejectedPreferences implements SharedPreferences {
   Future<bool> remove(String key) async => false;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FailingDilemmaGateway implements CreatorDilemmaGateway {
+  @override
+  Future<List<CreatorDilemmaSummary>> fetchDilemmas() =>
+      throw StateError('simulated network failure fetching dilemmas');
+
+  @override
+  Future<void> revokeInvite(String dilemmaId) => throw UnimplementedError();
+
+  @override
+  Future<void> deleteDilemma(String dilemmaId) => throw UnimplementedError();
 }

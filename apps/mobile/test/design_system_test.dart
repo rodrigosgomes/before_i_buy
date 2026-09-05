@@ -99,4 +99,40 @@ void main() {
     expect(purpose, DraftPurpose.gift);
     expect(find.text('Categoria'), findsOneWidget);
   });
+
+  testWidgets('secondary and destructive buttons render and handle taps', (
+    tester,
+  ) async {
+    var secondaryTapped = false;
+    var destructiveTapped = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildBibTheme(),
+        home: Scaffold(
+          body: Column(
+            children: [
+              BibSecondaryButton(
+                label: 'Ação Secundária',
+                onPressed: () => secondaryTapped = true,
+              ),
+              BibDestructiveButton(
+                label: 'Ação Destrutiva',
+                onPressed: () => destructiveTapped = true,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Ação Secundária'), findsOneWidget);
+    expect(find.text('Ação Destrutiva'), findsOneWidget);
+
+    await tester.tap(find.text('Ação Secundária'));
+    expect(secondaryTapped, isTrue);
+
+    await tester.tap(find.text('Ação Destrutiva'));
+    expect(destructiveTapped, isTrue);
+  });
 }

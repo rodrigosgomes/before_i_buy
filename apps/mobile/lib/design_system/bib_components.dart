@@ -49,10 +49,11 @@ class BibPageShell extends StatelessWidget {
 }
 
 class BibTopBar extends StatelessWidget implements PreferredSizeWidget {
-  const BibTopBar({super.key, required this.title, this.onBack});
+  const BibTopBar({super.key, required this.title, this.onBack, this.actions});
 
   final String title;
   final VoidCallback? onBack;
+  final List<Widget>? actions;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -68,6 +69,7 @@ class BibTopBar extends StatelessWidget implements PreferredSizeWidget {
             icon: const Icon(Icons.arrow_back_rounded),
           ),
     title: Text(title),
+    actions: actions,
   );
 }
 
@@ -91,6 +93,74 @@ class BibPrimaryButton extends StatelessWidget {
       width: double.infinity,
       height: 52,
       child: FilledButton(
+        onPressed: loading ? null : onPressed,
+        child: loading
+            ? const SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(label),
+      ),
+    ),
+  );
+}
+
+class BibSecondaryButton extends StatelessWidget {
+  const BibSecondaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    enabled: onPressed != null && !loading,
+    child: SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton(
+        onPressed: loading ? null : onPressed,
+        child: loading
+            ? const SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(label),
+      ),
+    ),
+  );
+}
+
+class BibDestructiveButton extends StatelessWidget {
+  const BibDestructiveButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    enabled: onPressed != null && !loading,
+    child: SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Theme.of(context).colorScheme.error,
+          side: BorderSide(color: Theme.of(context).colorScheme.error),
+        ),
         onPressed: loading ? null : onPressed,
         child: loading
             ? const SizedBox.square(
