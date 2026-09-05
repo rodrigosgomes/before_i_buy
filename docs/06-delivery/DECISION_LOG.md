@@ -210,3 +210,23 @@ Cada entrada segue o padrão:
   exige desativar a versão interna e cadastrar versões jurídicas aprovadas.
 - **Gatilho de Revisão:** Antes de qualquer domínio público, deploy do Web
   convidado para terceiros, beta externo ou envio a lojas.
+
+---
+
+### DEC-016: Staging HTTPS Controlado para Aceite Interno da Entrega 1
+- **Data:** 2026-09-05
+- **Status:** `Aceito`
+- **Contexto:** O aceite técnico precisa exercitar compartilhamento nativo,
+  cookie same-origin e voto em aparelhos reais. A rota existente está atrás da
+  Cloudflare, mas apresenta desafio anti-bot e ainda não serve o cliente Web.
+- **Decisão:** Usar `myelolabs.com.br/eloease/guest-invite` como staging da
+  Entrega 1 somente para equipe e testadores internos autorizados. Os testes
+  usam dados fictícios, links distribuídos de forma controlada e consentimento
+  `internal-demo-v1`. A página e as duas rotas do proxy ficam sem cache,
+  indexação ou desafio interativo. Nenhum recrutamento externo é permitido.
+- **Consequências:** O fluxo real pode ser medido sem declarar beta ou validar
+  a hipótese de mercado. A amostra 3+3 é evidência de usabilidade interna e não
+  sustenta métricas de conversão ou liquidez.
+- **Gatilho de Revisão:** Qualquer acesso de terceiros, recrutamento, divulgação
+  do staging, troca de domínio ou intenção de beta externo exige cumprir os
+  gates jurídicos, de privacidade, retenção, backup e resposta a incidentes.

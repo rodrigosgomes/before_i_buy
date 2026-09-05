@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'core/app_config.dart';
 import 'features/auth/auth_gateway.dart';
+import 'features/analytics/creator_analytics.dart';
 import 'features/creator/creator_remote_gateway.dart';
 import 'features/creator/share_plus_invite_share_gateway.dart';
 
@@ -15,6 +16,8 @@ Future<void> main() async {
   DilemmaPublicationGateway publicationGateway =
       MemoryDilemmaPublicationGateway();
   CreatorDilemmaGateway dilemmaGateway = MemoryCreatorDilemmaGateway();
+  CreatorAnalyticsFactory analyticsFactory = (_) =>
+      const NoopCreatorAnalytics();
   if (config.hasSupabaseConfiguration) {
     await Supabase.initialize(
       url: config.supabaseUrl,
@@ -34,6 +37,10 @@ Future<void> main() async {
       Supabase.instance.client,
     );
     dilemmaGateway = SupabaseCreatorDilemmaGateway(Supabase.instance.client);
+    analyticsFactory = (userId) => QueuedCreatorAnalytics(
+      queue: SharedPreferencesCreatorAnalyticsQueue(userId: userId),
+      transport: SupabaseCreatorAnalyticsTransport(Supabase.instance.client),
+    );
   }
   runApp(
     BeforeIBuyApp(
@@ -43,6 +50,7 @@ Future<void> main() async {
       publicationGateway: publicationGateway,
       dilemmaGateway: dilemmaGateway,
       shareGateway: SharePlusInviteShareGateway(),
+      analyticsFactory: analyticsFactory,
     ),
   );
 }
