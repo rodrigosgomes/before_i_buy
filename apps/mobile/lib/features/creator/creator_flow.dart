@@ -11,11 +11,15 @@ class CreatorHomeScreen extends StatelessWidget {
     required this.onCreate,
     this.dilemmas = const [],
     this.onSelectDilemma,
+    this.loadError,
+    this.onRetry,
   });
 
   final VoidCallback onCreate;
   final List<CreatorDilemmaSummary> dilemmas;
   final ValueChanged<CreatorDilemmaSummary>? onSelectDilemma;
+  final String? loadError;
+  final Future<void> Function()? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +41,12 @@ class CreatorHomeScreen extends StatelessWidget {
               'Acompanhe os votos recebidos ou revogue o acesso quando quiser.',
             ),
             const SizedBox(height: BibSpacing.x5),
+            if (loadError != null) ...[
+              BibInlineMessage(message: loadError!, kind: BibMessageKind.error),
+              const SizedBox(height: BibSpacing.x2),
+              BibSecondaryButton(label: 'Tentar atualizar', onPressed: onRetry),
+              const SizedBox(height: BibSpacing.x4),
+            ],
             ...dilemmas.map(
               (dilemma) => _DilemmaCard(
                 dilemma: dilemma,
@@ -78,6 +88,18 @@ class CreatorHomeScreen extends StatelessWidget {
                   'Organize a vontade, peça perspectiva a pessoas próximas e escolha no seu tempo.',
                 ),
                 const SizedBox(height: BibSpacing.x6),
+                if (loadError != null) ...[
+                  BibInlineMessage(
+                    message: loadError!,
+                    kind: BibMessageKind.error,
+                  ),
+                  const SizedBox(height: BibSpacing.x2),
+                  BibSecondaryButton(
+                    label: 'Tentar atualizar',
+                    onPressed: onRetry,
+                  ),
+                  const SizedBox(height: BibSpacing.x4),
+                ],
                 const _Chapter(number: '1', label: 'Conte o que está pensando'),
                 const _Chapter(number: '2', label: 'Ouça perspectivas'),
                 const _Chapter(number: '3', label: 'Decida você'),
@@ -85,7 +107,7 @@ class CreatorHomeScreen extends StatelessWidget {
                 const BibPrivacyNotice(
                   title: 'Seu espaço é privado',
                   body:
-                      'Seus dilemas só abrirão para quem receber um link em uma etapa futura.',
+                      'Seus dilemas só abrem para quem receber o link privado.',
                 ),
               ],
             ),
@@ -443,7 +465,7 @@ class _GuestPreviewScreenState extends State<GuestPreviewScreen> {
         ),
         const SizedBox(height: BibSpacing.x3),
         const Text(
-          'O link é privado, mas pode ser encaminhado. Você poderá revogá-lo em uma etapa futura.',
+          'O link é privado, mas pode ser encaminhado. Você poderá revogá-lo no painel do dilema.',
         ),
         const SizedBox(height: BibSpacing.x5),
         if (widget.draft.publicationPending) ...[
@@ -577,7 +599,7 @@ class DilemmaDashboardScreen extends StatefulWidget {
   final Future<String?> Function()? onShare;
   final Future<String?> Function() onRevoke;
   final Future<String?> Function() onDelete;
-  final Future<void> Function()? onRefresh;
+  final Future<String?> Function()? onRefresh;
 
   @override
   State<DilemmaDashboardScreen> createState() => _DilemmaDashboardScreenState();
@@ -587,10 +609,31 @@ class _DilemmaDashboardScreenState extends State<DilemmaDashboardScreen> {
   var _revoking = false;
   var _deleting = false;
   var _sharing = false;
+  var _refreshing = false;
   String? _error;
 
   Future<void> _handleShare() async {
     if (widget.onShare == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Compartilhar este convite?'),
+        content: const Text(
+          'O link é privado, mas pode ser encaminhado por quem o receber. Você poderá revogá-lo imediatamente neste painel.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Compartilhar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() {
       _sharing = true;
       _error = null;
@@ -599,6 +642,20 @@ class _DilemmaDashboardScreenState extends State<DilemmaDashboardScreen> {
     if (!mounted) return;
     setState(() {
       _sharing = false;
+      _error = error;
+    });
+  }
+
+  Future<void> _handleRefresh() async {
+    if (widget.onRefresh == null || _refreshing) return;
+    setState(() {
+      _refreshing = true;
+      _error = null;
+    });
+    final error = await widget.onRefresh!();
+    if (!mounted) return;
+    setState(() {
+      _refreshing = false;
       _error = error;
     });
   }
@@ -686,9 +743,16 @@ class _DilemmaDashboardScreenState extends State<DilemmaDashboardScreen> {
         actions: [
           if (widget.onRefresh != null)
             IconButton(
-              icon: const Icon(Icons.refresh_rounded),
+              icon: _refreshing
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded),
               tooltip: 'Atualizar perspectivas',
-              onPressed: widget.onRefresh,
+              onPressed: _sharing || _revoking || _deleting || _refreshing
+                  ? null
+                  : _handleRefresh,
             ),
         ],
       ),

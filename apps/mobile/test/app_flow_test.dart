@@ -38,6 +38,7 @@ BeforeIBuyApp testApp({
   DilemmaPublicationGateway? publication,
   CreatorDilemmaGateway? dilemmaGateway,
   InviteShareGateway? share,
+  Future<void> Function()? purgeLegacyInvites,
 }) => BeforeIBuyApp(
   config: config,
   authGateway: auth,
@@ -50,6 +51,7 @@ BeforeIBuyApp testApp({
   shareGateway: share,
   createId: () => uuid,
   platform: platform,
+  purgeLegacyInvites: purgeLegacyInvites,
 );
 
 Future<void> tapVisible(WidgetTester tester, Finder finder) async {
@@ -83,6 +85,41 @@ void main() {
     expect(find.textContaining('GOOGLE_WEB_CLIENT_ID'), findsOneWidget);
     expect(auth.googleSignInCount, 0);
   });
+
+  testWidgets(
+    'legacy invite cleanup fails closed before configuration and retries',
+    (tester) async {
+      var attempts = 0;
+      var fail = true;
+      Future<void> purge() async {
+        attempts++;
+        if (fail) throw StateError('simulated cleanup failure');
+      }
+
+      await tester.pumpWidget(
+        testApp(
+          auth: FakeAuthGateway(),
+          config: const AppConfig(
+            supabaseUrl: '',
+            supabasePublishableKey: '',
+            googleWebClientId: '',
+            googleIosClientId: '',
+          ),
+          purgeLegacyInvites: purge,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Proteção local pendente'), findsOneWidget);
+      expect(find.text('Configuração interna ausente'), findsNothing);
+      expect(attempts, 1);
+
+      fail = false;
+      await tapVisible(tester, find.text('Tentar novamente'));
+      expect(find.text('Configuração interna ausente'), findsOneWidget);
+      expect(attempts, 2);
+    },
+  );
 
   testWidgets('Google cancellation is neutral and failures are generic', (
     tester,
@@ -402,6 +439,7 @@ void main() {
 
       // Re-share from dashboard
       await tapVisible(tester, find.text('Compartilhar convite'));
+      await tapVisible(tester, find.text('Compartilhar'));
       expect(share.shared, [inviteUri]);
 
       // Revoke invite
@@ -530,6 +568,218 @@ void main() {
       expect(find.text('Um pouco de espaço antes de decidir'), findsOneWidget);
     },
   );
+
+  testWidgets('initial dilemma load failure shows retry and then recovers', (
+    tester,
+  ) async {
+    final dilemma = CreatorDilemmaSummary(
+      id: uuid,
+      itemName: 'Cadeira Ergonômica',
+      priceCents: 180000,
+      currency: 'BRL',
+      category: ItemCategory.homeLiving,
+      purpose: DraftPurpose.forSelf,
+      reason: 'Melhorar a postura no trabalho diário.',
+      pauseDueAt: DateTime.now().add(const Duration(days: 3)),
+      state: 'collecting_votes',
+      isInviteRevoked: false,
+      createdAt: DateTime.now(),
+      buyCount: 0,
+      waitCount: 0,
+      skipCount: 0,
+      totalVotes: 0,
+    );
+    final gateway = _FailingRefreshDilemmaGateway([dilemma])
+      ..failNextFetch = true;
+
+    await tester.pumpWidget(
+      testApp(
+        auth: FakeAuthGateway(authenticated: true),
+        onboarding: MemoryOnboardingRepository(completeOnboarding),
+        dilemmaGateway: gateway,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Não foi possível carregar seus dilemas agora.'),
+      findsOneWidget,
+    );
+    expect(find.text('Tentar atualizar'), findsOneWidget);
+    expect(find.text('Cadeira Ergonômica'), findsNothing);
+
+    gateway.failNextFetch = false;
+    await tapVisible(tester, find.text('Tentar atualizar'));
+    expect(find.text('Cadeira Ergonômica'), findsOneWidget);
+    expect(
+      find.text('Não foi possível carregar seus dilemas agora.'),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'remote revoke and delete remain successful when local cleanup fails',
+    (tester) async {
+      final dilemma = CreatorDilemmaSummary(
+        id: uuid,
+        itemName: 'Cadeira Ergonômica',
+        priceCents: 180000,
+        currency: 'BRL',
+        category: ItemCategory.homeLiving,
+        purpose: DraftPurpose.forSelf,
+        reason: 'Melhorar a postura no trabalho diário.',
+        pauseDueAt: DateTime.now().add(const Duration(days: 3)),
+        state: 'collecting_votes',
+        isInviteRevoked: false,
+        createdAt: DateTime.now(),
+        buyCount: 1,
+        waitCount: 0,
+        skipCount: 0,
+        totalVotes: 1,
+      );
+      final gateway = MemoryCreatorDilemmaGateway(initial: [dilemma]);
+      final invites = _FailingRemovalActiveInviteRepository();
+      await invites.saveInviteUri(
+        uuid,
+        Uri.parse('https://guest.example.com/invite/token'),
+      );
+
+      await tester.pumpWidget(
+        testApp(
+          auth: FakeAuthGateway(authenticated: true),
+          onboarding: MemoryOnboardingRepository(completeOnboarding),
+          dilemmaGateway: gateway,
+          activeInvites: invites,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.text('Cadeira Ergonômica'));
+
+      await tapVisible(tester, find.text('Revogar convite'));
+      await tapVisible(tester, find.text('Revogar'));
+      expect(find.text('Convite revogado · votação encerrada'), findsOneWidget);
+      expect(find.text('Compartilhar convite'), findsNothing);
+      expect(
+        find.text('Não foi possível revogar o convite agora.'),
+        findsNothing,
+      );
+
+      await tapVisible(tester, find.text('Apagar dilema'));
+      await tapVisible(tester, find.text('Apagar definitivamente'));
+      expect(find.text('Cadeira Ergonômica'), findsNothing);
+      expect(await gateway.fetchDilemmas(), isEmpty);
+      expect(
+        find.text('Não foi possível apagar o dilema agora.'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets('late refresh from account A cannot replace account B data', (
+    tester,
+  ) async {
+    final gateway = _SessionSwitchDilemmaGateway();
+    final auth = FakeAuthGateway(authenticated: true)..accountId = 'account-a';
+
+    await tester.pumpWidget(
+      testApp(
+        auth: auth,
+        onboarding: MemoryOnboardingRepository(completeOnboarding),
+        dilemmaGateway: gateway,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text('Dilema da conta A'));
+
+    await tester.tap(find.byTooltip('Atualizar perspectivas'));
+    await tester.pump();
+    gateway.serveAccountB = true;
+    auth.completeSignIn(userId: 'account-b');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dilema da conta B'), findsOneWidget);
+    gateway.refreshCompleter.complete([gateway.accountA]);
+    await tester.pumpAndSettle();
+    expect(find.text('Dilema da conta B'), findsOneWidget);
+    expect(find.text('Dilema da conta A'), findsNothing);
+  });
+
+  testWidgets(
+    'late revocation from account A cannot alter account B or its invite',
+    (tester) async {
+      final gateway = _SessionSwitchDilemmaGateway(delayRevoke: true);
+      final auth = FakeAuthGateway(authenticated: true)
+        ..accountId = 'account-a';
+      final invites = _TrackingActiveInviteRepository();
+      await invites.saveInviteUri(
+        gateway.accountB.id,
+        Uri.parse('https://guest.example.com/invite/account-b'),
+      );
+
+      await tester.pumpWidget(
+        testApp(
+          auth: auth,
+          onboarding: MemoryOnboardingRepository(completeOnboarding),
+          dilemmaGateway: gateway,
+          activeInvites: invites,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.text('Dilema da conta A'));
+      await tapVisible(tester, find.text('Revogar convite'));
+      await tester.tap(find.text('Revogar'));
+      await tester.pump();
+
+      gateway.serveAccountB = true;
+      auth.completeSignIn(userId: 'account-b');
+      await tester.pumpAndSettle();
+      gateway.revokeCompleter.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dilema da conta B'), findsOneWidget);
+      expect(gateway.accountB.isInviteRevoked, isFalse);
+      expect(invites.removedIds, isEmpty);
+      expect(await invites.getInviteUri(gateway.accountB.id), isNotNull);
+    },
+  );
+
+  testWidgets(
+    'late deletion from account A cannot alter account B or its invite',
+    (tester) async {
+      final gateway = _SessionSwitchDilemmaGateway(delayDelete: true);
+      final auth = FakeAuthGateway(authenticated: true)
+        ..accountId = 'account-a';
+      final invites = _TrackingActiveInviteRepository();
+      await invites.saveInviteUri(
+        gateway.accountB.id,
+        Uri.parse('https://guest.example.com/invite/account-b'),
+      );
+
+      await tester.pumpWidget(
+        testApp(
+          auth: auth,
+          onboarding: MemoryOnboardingRepository(completeOnboarding),
+          dilemmaGateway: gateway,
+          activeInvites: invites,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.text('Dilema da conta A'));
+      await tapVisible(tester, find.text('Apagar dilema'));
+      await tester.tap(find.text('Apagar definitivamente'));
+      await tester.pump();
+
+      gateway.serveAccountB = true;
+      auth.completeSignIn(userId: 'account-b');
+      await tester.pumpAndSettle();
+      gateway.deleteCompleter.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dilema da conta B'), findsOneWidget);
+      expect(invites.removedIds, isEmpty);
+      expect(await invites.getInviteUri(gateway.accountB.id), isNotNull);
+    },
+  );
 }
 
 class _DelayedActiveInviteRepository implements ActiveInviteRepository {
@@ -543,6 +793,87 @@ class _DelayedActiveInviteRepository implements ActiveInviteRepository {
 
   @override
   Future<void> removeInviteUri(String dilemmaId) async {}
+}
+
+class _FailingRemovalActiveInviteRepository implements ActiveInviteRepository {
+  Uri? value;
+
+  @override
+  Future<Uri?> getInviteUri(String dilemmaId) async => value;
+
+  @override
+  Future<void> saveInviteUri(String dilemmaId, Uri inviteUri) async {
+    value = inviteUri;
+  }
+
+  @override
+  Future<void> removeInviteUri(String dilemmaId) async {
+    throw StateError('simulated local cleanup failure');
+  }
+}
+
+class _TrackingActiveInviteRepository extends MemoryActiveInviteRepository {
+  final removedIds = <String>[];
+
+  @override
+  Future<void> removeInviteUri(String dilemmaId) async {
+    removedIds.add(dilemmaId);
+    await super.removeInviteUri(dilemmaId);
+  }
+}
+
+class _SessionSwitchDilemmaGateway implements CreatorDilemmaGateway {
+  _SessionSwitchDilemmaGateway({
+    this.delayRevoke = false,
+    this.delayDelete = false,
+  });
+
+  final bool delayRevoke;
+  final bool delayDelete;
+  final refreshCompleter = Completer<List<CreatorDilemmaSummary>>();
+  final revokeCompleter = Completer<void>();
+  final deleteCompleter = Completer<void>();
+  bool serveAccountB = false;
+  var fetchCount = 0;
+
+  late final accountA = _dilemma('account-a-dilemma', 'Dilema da conta A');
+  late final accountB = _dilemma('account-b-dilemma', 'Dilema da conta B');
+
+  @override
+  Future<List<CreatorDilemmaSummary>> fetchDilemmas() {
+    fetchCount++;
+    if (!serveAccountB && fetchCount > 1) return refreshCompleter.future;
+    return Future.value([serveAccountB ? accountB : accountA]);
+  }
+
+  @override
+  Future<void> revokeInvite(String dilemmaId) async {
+    if (delayRevoke) await revokeCompleter.future;
+  }
+
+  @override
+  Future<void> deleteDilemma(String dilemmaId) async {
+    if (delayDelete) await deleteCompleter.future;
+  }
+
+  static CreatorDilemmaSummary _dilemma(String id, String name) =>
+      CreatorDilemmaSummary(
+        id: id,
+        itemName: name,
+        priceCents: 10000,
+        currency: 'BRL',
+        category: ItemCategory.other,
+        purpose: DraftPurpose.forSelf,
+        reason: 'Contexto suficiente para o teste de sessão.',
+        pauseDueAt: DateTime.now().add(const Duration(days: 3)),
+        state: 'collecting_votes',
+        isInviteRevoked: false,
+        createdAt: DateTime.now(),
+        buyCount: 0,
+        waitCount: 0,
+        skipCount: 0,
+        totalVotes: 0,
+      );
 }
 
 class _FailingRefreshDilemmaGateway implements CreatorDilemmaGateway {

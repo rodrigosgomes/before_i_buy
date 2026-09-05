@@ -24,20 +24,31 @@ void main() {
     privacyAccepted: true,
   );
 
-  SupabaseClient client(Future<http.Response> Function(http.Request) handler) =>
-      SupabaseClient(
-        'https://example.supabase.co',
-        'public-key',
-        httpClient: MockClient((request) async {
-          final response = await handler(request);
-          return http.Response.bytes(
-            response.bodyBytes,
-            response.statusCode,
-            request: request,
-            headers: {'content-type': 'application/json'},
-          );
-        }),
-      );
+  final clients = <SupabaseClient>[];
+  SupabaseClient client(Future<http.Response> Function(http.Request) handler) {
+    final value = SupabaseClient(
+      'https://example.supabase.co',
+      'public-key',
+      httpClient: MockClient((request) async {
+        final response = await handler(request);
+        return http.Response.bytes(
+          response.bodyBytes,
+          response.statusCode,
+          request: request,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    clients.add(value);
+    return value;
+  }
+
+  tearDown(() async {
+    for (final client in clients) {
+      await client.dispose();
+    }
+    clients.clear();
+  });
 
   test(
     'real publication gateway sends the exact RPC payload and parses table result',
@@ -232,16 +243,15 @@ void main() {
     },
   );
 
-  test(
-    'dilemma gateway returns empty list on malformed or non-list response',
-    () async {
-      final gateway = SupabaseCreatorDilemmaGateway(
-        client((_) async => http.Response('{"error": "bad"}', 200)),
-      );
-      final list = await gateway.fetchDilemmas();
-      expect(list, isEmpty);
-    },
-  );
+  test('dilemma gateway rejects malformed or non-list response', () async {
+    final gateway = SupabaseCreatorDilemmaGateway(
+      client((_) async => http.Response('{"error": "bad"}', 200)),
+    );
+    await expectLater(
+      gateway.fetchDilemmas(),
+      throwsA(isA<CreatorDilemmaResponseException>()),
+    );
+  });
 
   test('dilemma gateway calls revoke_dilemma_invite RPC', () async {
     final gateway = SupabaseCreatorDilemmaGateway(

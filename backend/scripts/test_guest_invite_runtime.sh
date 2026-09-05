@@ -235,9 +235,13 @@ SQL
 )" = "wait"
 
 run_psql <<SQL >/dev/null
-update public.dilemmas
-   set is_invite_revoked = true
- where id = '$runtime_dilemma_id';
+begin;
+select set_config('request.jwt.claim.sub', '$runtime_owner_id', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+set local role authenticated;
+select public.revoke_dilemma_invite('$runtime_dilemma_id');
+commit;
+delete from public.guest_rate_limits where scope = 'invite_open';
 SQL
 
 revoked_vote_status="$(curl --silent --show-error --connect-timeout 1 --max-time 5 \
@@ -253,3 +257,17 @@ revoked_vote_status="$(curl --silent --show-error --connect-timeout 1 --max-time
 
 test "$revoked_vote_status" = "404"
 test "$(cat "$revoked_vote_body")" = '{"error":"vote_unavailable"}'
+
+revoked_open_status="$(curl --silent --show-error --connect-timeout 1 --max-time 5 \
+  --dump-header "$response_headers" \
+  --output "$response_body" \
+  --write-out '%{http_code}' \
+  --request POST \
+  --header 'origin: http://127.0.0.1:56321' \
+  --header 'content-type: application/json' \
+  --data "{\"inviteToken\":\"$runtime_invite_token\"}" \
+  http://127.0.0.1:56321/functions/v1/guest-invite)"
+
+test "$revoked_open_status" = "404"
+test "$(cat "$response_body")" = '{"error":"invite_unavailable"}'
+! grep -qi '^set-cookie:' "$response_headers"

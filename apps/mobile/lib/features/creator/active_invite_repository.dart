@@ -6,42 +6,25 @@ abstract interface class ActiveInviteRepository {
   Future<void> removeInviteUri(String dilemmaId);
 }
 
-class SharedPreferencesActiveInviteRepository
-    implements ActiveInviteRepository {
-  SharedPreferencesActiveInviteRepository({
-    required this.userId,
-    Future<SharedPreferences>? preferences,
-  }) : _preferences = preferences ?? SharedPreferences.getInstance();
-
+abstract final class LegacyActiveInviteStorage {
   static const storageKey = 'bib.active_invites.v1';
-  final Future<SharedPreferences> _preferences;
-  final String userId;
 
-  String _scopedKey(String dilemmaId) => '$storageKey.$userId.$dilemmaId';
-
-  @override
-  Future<Uri?> getInviteUri(String dilemmaId) async {
-    final raw = (await _preferences).getString(_scopedKey(dilemmaId));
-    if (raw == null) return null;
-    return Uri.tryParse(raw);
-  }
-
-  @override
-  Future<void> saveInviteUri(String dilemmaId, Uri inviteUri) async {
-    final saved = await (await _preferences).setString(
-      _scopedKey(dilemmaId),
-      inviteUri.toString(),
-    );
-    if (!saved) throw StateError('Active invite was not saved.');
-  }
-
-  @override
-  Future<void> removeInviteUri(String dilemmaId) async {
-    final prefs = await _preferences;
-    final key = _scopedKey(dilemmaId);
-    if (!prefs.containsKey(key)) return;
-    final removed = await prefs.remove(key);
-    if (!removed) throw StateError('Active invite was not removed.');
+  static Future<void> purgeAll({
+    Future<SharedPreferences>? preferences,
+    Future<bool> Function(SharedPreferences preferences, String key)? removeKey,
+  }) async {
+    final prefs = await (preferences ?? SharedPreferences.getInstance());
+    final remove = removeKey ?? (preferences, key) => preferences.remove(key);
+    final legacyKeys = prefs
+        .getKeys()
+        .where((key) => key.startsWith('$storageKey.'))
+        .toList(growable: false);
+    for (final key in legacyKeys) {
+      final removed = await remove(prefs, key);
+      if (!removed || prefs.containsKey(key)) {
+        throw StateError('Could not purge legacy invite storage.');
+      }
+    }
   }
 }
 

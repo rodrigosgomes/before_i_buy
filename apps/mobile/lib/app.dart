@@ -31,6 +31,7 @@ class BeforeIBuyApp extends StatelessWidget {
     InviteShareGateway? shareGateway,
     String Function()? createId,
     TargetPlatform? platform,
+    Future<void> Function()? purgeLegacyInvites,
   }) : creatorProfileGateway =
            creatorProfileGateway ?? MemoryCreatorProfileGateway(),
        publicationGateway =
@@ -38,7 +39,9 @@ class BeforeIBuyApp extends StatelessWidget {
        dilemmaGateway = dilemmaGateway ?? MemoryCreatorDilemmaGateway(),
        shareGateway = shareGateway ?? MemoryInviteShareGateway(),
        createId = createId ?? const Uuid().v4,
-       platform = platform ?? defaultTargetPlatform;
+       platform = platform ?? defaultTargetPlatform,
+       purgeLegacyInvites =
+           purgeLegacyInvites ?? LegacyActiveInviteStorage.purgeAll;
 
   final AppConfig config;
   final AuthGateway? authGateway;
@@ -51,6 +54,7 @@ class BeforeIBuyApp extends StatelessWidget {
   final InviteShareGateway shareGateway;
   final String Function() createId;
   final TargetPlatform platform;
+  final Future<void> Function() purgeLegacyInvites;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -69,11 +73,13 @@ class BeforeIBuyApp extends StatelessWidget {
       shareGateway: shareGateway,
       createId: createId,
       platform: platform,
+      purgeLegacyInvites: purgeLegacyInvites,
     ),
   );
 }
 
 enum AppStage {
+  privacyCleanupFailed,
   configurationMissing,
   loading,
   googleSignIn,
@@ -101,6 +107,7 @@ class AppFlow extends StatefulWidget {
     required this.shareGateway,
     required this.createId,
     required this.platform,
+    required this.purgeLegacyInvites,
   });
 
   final AppConfig config;
@@ -114,6 +121,7 @@ class AppFlow extends StatefulWidget {
   final InviteShareGateway shareGateway;
   final String Function() createId;
   final TargetPlatform platform;
+  final Future<void> Function() purgeLegacyInvites;
 
   @override
   State<AppFlow> createState() => _AppFlowState();
@@ -131,6 +139,8 @@ class _AppFlowState extends State<AppFlow> {
   List<CreatorDilemmaSummary> _dilemmas = const [];
   CreatorDilemmaSummary? _selectedDilemma;
   Uri? _activeInviteUri;
+  ActiveInviteRepository? _sessionInviteRepository;
+  String? _dilemmaLoadError;
   String? _userId;
   int _sessionGeneration = 0;
   Future<void> _draftWrites = Future.value();
@@ -144,8 +154,7 @@ class _AppFlowState extends State<AppFlow> {
       widget.draftRepository ??
       SharedPreferencesDraftRepository(userId: _userId!);
   ActiveInviteRepository get _activeInviteRepository =>
-      widget.activeInviteRepository ??
-      SharedPreferencesActiveInviteRepository(userId: _userId!);
+      _sessionInviteRepository!;
 
   bool _isCurrent(int generation) =>
       mounted &&
@@ -166,6 +175,10 @@ class _AppFlowState extends State<AppFlow> {
     _dilemmas = const [];
     _selectedDilemma = null;
     _activeInviteUri = null;
+    _sessionInviteRepository = userId == null
+        ? null
+        : widget.activeInviteRepository ?? MemoryActiveInviteRepository();
+    _dilemmaLoadError = null;
     _publishing = false;
     _draftWriteError = null;
     _draftWrites = Future.value();
@@ -196,6 +209,12 @@ class _AppFlowState extends State<AppFlow> {
   }
 
   Future<void> _bootstrap() async {
+    try {
+      await widget.purgeLegacyInvites();
+    } catch (_) {
+      if (mounted) setState(() => _stage = AppStage.privacyCleanupFailed);
+      return;
+    }
     if (!widget.config.isReadyFor(widget.platform) ||
         widget.authGateway == null) {
       if (mounted) setState(() => _stage = AppStage.configurationMissing);
@@ -236,12 +255,22 @@ class _AppFlowState extends State<AppFlow> {
       setState(() => _stage = AppStage.profileSync);
       return;
     }
-    final dilemmas = await widget.dilemmaGateway.fetchDilemmas();
-    if (!_isCurrent(generation)) return;
-    setState(() {
-      _dilemmas = dilemmas;
-      _stage = AppStage.home;
-    });
+    try {
+      final dilemmas = await widget.dilemmaGateway.fetchDilemmas();
+      if (!_isCurrent(generation)) return;
+      setState(() {
+        _dilemmas = dilemmas;
+        _dilemmaLoadError = null;
+        _stage = AppStage.home;
+      });
+    } catch (_) {
+      if (!_isCurrent(generation)) return;
+      setState(() {
+        _dilemmas = const [];
+        _dilemmaLoadError = 'Não foi possível carregar seus dilemas agora.';
+        _stage = AppStage.home;
+      });
+    }
   }
 
   Future<void> _completeOnboarding(LocalOnboarding onboarding) async {
@@ -281,6 +310,7 @@ class _AppFlowState extends State<AppFlow> {
       if (!_isCurrent(generation)) return null;
       setState(() {
         _dilemmas = dilemmas;
+        _dilemmaLoadError = null;
         _stage = AppStage.home;
       });
       return null;
@@ -314,6 +344,7 @@ class _AppFlowState extends State<AppFlow> {
       return 'O convite ainda não está configurado para este ambiente.';
     }
     final repository = _draftRepository;
+    final inviteRepository = _activeInviteRepository;
     _publishing = true;
     try {
       final profileStatus = await widget.creatorProfileGateway.status();
@@ -339,10 +370,7 @@ class _AppFlowState extends State<AppFlow> {
       final inviteUri = GuestInviteLinkBuilder(
         widget.config.guestInviteBaseUri,
       ).build(published.inviteToken);
-      await _activeInviteRepository.saveInviteUri(
-        published.dilemmaId,
-        inviteUri,
-      );
+      await inviteRepository.saveInviteUri(published.dilemmaId, inviteUri);
       await repository.clear();
       List<CreatorDilemmaSummary> updatedDilemmas = _dilemmas;
       try {
@@ -370,13 +398,14 @@ class _AppFlowState extends State<AppFlow> {
     }
   }
 
-  Future<void> _refreshDilemmas() async {
+  Future<String?> _refreshDilemmas() async {
     final generation = _sessionGeneration;
     try {
       final dilemmas = await widget.dilemmaGateway.fetchDilemmas();
-      if (!_isCurrent(generation)) return;
+      if (!_isCurrent(generation)) return null;
       setState(() {
         _dilemmas = dilemmas;
+        _dilemmaLoadError = null;
         if (_selectedDilemma != null) {
           _selectedDilemma = dilemmas.firstWhere(
             (d) => d.id == _selectedDilemma!.id,
@@ -384,7 +413,13 @@ class _AppFlowState extends State<AppFlow> {
           );
         }
       });
-    } catch (_) {}
+      return null;
+    } catch (_) {
+      if (!_isCurrent(generation)) return null;
+      const error = 'Não foi possível atualizar as perspectivas agora.';
+      setState(() => _dilemmaLoadError = error);
+      return error;
+    }
   }
 
   Future<void> _openDashboard(CreatorDilemmaSummary dilemma) async {
@@ -400,9 +435,9 @@ class _AppFlowState extends State<AppFlow> {
 
   Future<String?> _revokeInvite(String dilemmaId) async {
     final generation = _sessionGeneration;
+    final inviteRepository = _activeInviteRepository;
     try {
       await widget.dilemmaGateway.revokeInvite(dilemmaId);
-      await _activeInviteRepository.removeInviteUri(dilemmaId);
       if (!_isCurrent(generation)) return null;
       setState(() {
         _activeInviteUri = null;
@@ -414,18 +449,23 @@ class _AppFlowState extends State<AppFlow> {
           _selectedDilemma = _selectedDilemma!.copyWith(isInviteRevoked: true);
         }
       });
-      await _refreshDilemmas();
-      return null;
     } catch (_) {
       return 'Não foi possível revogar o convite agora.';
     }
+    try {
+      await inviteRepository.removeInviteUri(dilemmaId);
+    } catch (_) {
+      // The server result is authoritative; a stale local link is invalid.
+    }
+    if (_isCurrent(generation)) await _refreshDilemmas();
+    return null;
   }
 
   Future<String?> _deleteDilemma(String dilemmaId) async {
     final generation = _sessionGeneration;
+    final inviteRepository = _activeInviteRepository;
     try {
       await widget.dilemmaGateway.deleteDilemma(dilemmaId);
-      await _activeInviteRepository.removeInviteUri(dilemmaId);
       if (!_isCurrent(generation)) return null;
       setState(() {
         _dilemmas = _dilemmas.where((d) => d.id != dilemmaId).toList();
@@ -433,11 +473,16 @@ class _AppFlowState extends State<AppFlow> {
         _activeInviteUri = null;
         _stage = AppStage.home;
       });
-      await _refreshDilemmas();
-      return null;
     } catch (_) {
       return 'Não foi possível apagar o dilema agora.';
     }
+    try {
+      await inviteRepository.removeInviteUri(dilemmaId);
+    } catch (_) {
+      // The deleted server resource remains deleted even if local cleanup fails.
+    }
+    if (_isCurrent(generation)) await _refreshDilemmas();
+    return null;
   }
 
   Future<String?> _shareFromDashboard() async {
@@ -470,6 +515,9 @@ class _AppFlowState extends State<AppFlow> {
 
   @override
   Widget build(BuildContext context) => switch (_stage) {
+    AppStage.privacyCleanupFailed => PrivacyCleanupFailedScreen(
+      onRetry: _bootstrap,
+    ),
     AppStage.configurationMissing => ConfigurationMissingScreen(
       missing: widget.config.missingFor(widget.platform),
     ),
@@ -486,6 +534,10 @@ class _AppFlowState extends State<AppFlow> {
       onCreate: _createDraft,
       dilemmas: _dilemmas,
       onSelectDilemma: _openDashboard,
+      loadError: _dilemmaLoadError,
+      onRetry: () async {
+        await _refreshDilemmas();
+      },
     ),
     AppStage.draft => DraftScreen(
       draft: _draft!,
@@ -548,6 +600,35 @@ class _AppFlowState extends State<AppFlow> {
       onRefresh: _refreshDilemmas,
     ),
   };
+}
+
+class PrivacyCleanupFailedScreen extends StatelessWidget {
+  const PrivacyCleanupFailedScreen({super.key, required this.onRetry});
+
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) => BibPageShell(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.privacy_tip_outlined, size: 52),
+        const SizedBox(height: BibSpacing.x5),
+        const Text(
+          'Proteção local pendente',
+          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: BibSpacing.x3),
+        const Text(
+          'Não foi possível concluir uma limpeza de segurança neste aparelho. '
+          'Tente novamente para continuar.',
+        ),
+        const SizedBox(height: BibSpacing.x5),
+        FilledButton(onPressed: onRetry, child: const Text('Tentar novamente')),
+      ],
+    ),
+  );
 }
 
 class ConfigurationMissingScreen extends StatelessWidget {

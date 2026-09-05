@@ -176,7 +176,9 @@ void main() {
 
       await tester.ensureVisible(find.text('Compartilhar convite'));
       await tester.tap(find.text('Compartilhar convite'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Compartilhar'));
+      await tester.pumpAndSettle();
       expect(shareCalled, isTrue);
     });
 
@@ -325,9 +327,11 @@ void main() {
       expect(find.text('Compartilhar convite'), findsNothing);
     });
 
-    testWidgets('refresh triggers onRefresh callback', (tester) async {
+    testWidgets('refresh reports failure and allows a successful retry', (
+      tester,
+    ) async {
       final dilemma = _dummyDilemma();
-      var refreshCalled = false;
+      var refreshCount = 0;
 
       await tester.pumpWidget(
         _wrap(
@@ -337,7 +341,12 @@ void main() {
             onShare: () async => null,
             onRevoke: () async => null,
             onDelete: () async => null,
-            onRefresh: () async => refreshCalled = true,
+            onRefresh: () async {
+              refreshCount += 1;
+              return refreshCount == 1
+                  ? 'Não foi possível atualizar as perspectivas agora.'
+                  : null;
+            },
           ),
         ),
       );
@@ -345,7 +354,52 @@ void main() {
       final refreshBtn = find.byTooltip('Atualizar perspectivas');
       expect(refreshBtn, findsOneWidget);
       await tester.tap(refreshBtn);
-      expect(refreshCalled, isTrue);
+      await tester.pumpAndSettle();
+      expect(refreshCount, 1);
+      expect(
+        find.text('Não foi possível atualizar as perspectivas agora.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(refreshBtn);
+      await tester.pumpAndSettle();
+      expect(refreshCount, 2);
+      expect(
+        find.text('Não foi possível atualizar as perspectivas agora.'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('re-share warns that the private link may be forwarded', (
+      tester,
+    ) async {
+      final dilemma = _dummyDilemma();
+      var shareCalled = false;
+      await tester.pumpWidget(
+        _wrap(
+          DilemmaDashboardScreen(
+            dilemma: dilemma,
+            onBack: () {},
+            onShare: () async {
+              shareCalled = true;
+              return null;
+            },
+            onRevoke: () async => null,
+            onDelete: () async => null,
+          ),
+        ),
+      );
+
+      await tester.ensureVisible(find.text('Compartilhar convite'));
+      await tester.tap(find.text('Compartilhar convite'));
+      await tester.pumpAndSettle();
+      expect(find.text('Compartilhar este convite?'), findsOneWidget);
+      expect(find.textContaining('pode ser encaminhado'), findsOneWidget);
+      expect(shareCalled, isFalse);
+
+      await tester.tap(find.text('Compartilhar'));
+      await tester.pumpAndSettle();
+      expect(shareCalled, isTrue);
     });
 
     testWidgets(

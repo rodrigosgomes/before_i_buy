@@ -1,6 +1,6 @@
 begin;
 
-select plan(19);
+select plan(20);
 
 insert into auth.users (id)
 values
@@ -221,6 +221,18 @@ select results_eq(
   'Owner A sees is_invite_revoked = true after revoking'
 );
 
+select is(
+  (
+    select count(*)::bigint
+      from public.guest_access_sessions gas
+      join public.dilemmas d on d.id = gas.dilemma_id
+     where d.owner_id = '00000000-0000-4000-8000-000000000401'
+       and gas.revoked_at is not null
+  ),
+  2::bigint,
+  'revoking through the owner RPC invalidates every existing guest session'
+);
+
 -- Owner B cannot delete Owner A's dilemma
 select throws_ok(
   $$select pg_temp.delete_as(
@@ -270,4 +282,3 @@ select is(
 
 select * from finish();
 rollback;
-

@@ -244,6 +244,10 @@ class PublicationResponseException implements Exception {
   const PublicationResponseException();
 }
 
+class CreatorDilemmaResponseException implements Exception {
+  const CreatorDilemmaResponseException();
+}
+
 class SupabaseCreatorDilemmaGateway implements CreatorDilemmaGateway {
   SupabaseCreatorDilemmaGateway(this._client);
 
@@ -252,14 +256,20 @@ class SupabaseCreatorDilemmaGateway implements CreatorDilemmaGateway {
   @override
   Future<List<CreatorDilemmaSummary>> fetchDilemmas() async {
     final response = await _client.rpc('get_creator_dilemmas');
-    if (response is! List) return [];
-    return response
-        .whereType<Map>()
-        .map(
-          (row) =>
-              CreatorDilemmaSummary.fromJson(Map<String, dynamic>.from(row)),
-        )
-        .toList();
+    if (response is! List || response.any((row) => row is! Map)) {
+      throw const CreatorDilemmaResponseException();
+    }
+    try {
+      return response
+          .cast<Map>()
+          .map(
+            (row) =>
+                CreatorDilemmaSummary.fromJson(Map<String, dynamic>.from(row)),
+          )
+          .toList();
+    } catch (_) {
+      throw const CreatorDilemmaResponseException();
+    }
   }
 
   @override

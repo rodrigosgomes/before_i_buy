@@ -11,9 +11,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {
-  // Construct real HTTP transports before installing the widget test binding.
-  final adminTransport = IOClient(HttpClient());
-  final creatorTransport = IOClient(HttpClient());
+  final runsAgainstLocalSupabase =
+      Platform.environment['LOCAL_SUPABASE_ANON_KEY'] != null;
+  // Construct real transports before installing the widget test binding only
+  // when this separately-gated system test will actually run.
+  final adminTransport = runsAgainstLocalSupabase
+      ? IOClient(HttpClient())
+      : null;
+  final creatorTransport = runsAgainstLocalSupabase
+      ? IOClient(HttpClient())
+      : null;
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues({});
 
@@ -29,11 +36,15 @@ void main() {
           'Run node scripts/ci/test-mobile-supabase.mjs from the repository root.',
         );
       }
-      final admin = SupabaseClient(url, serviceKey, httpClient: adminTransport);
+      final admin = SupabaseClient(
+        url,
+        serviceKey,
+        httpClient: adminTransport!,
+      );
       final creator = SupabaseClient(
         url,
         anonKey,
-        httpClient: creatorTransport,
+        httpClient: creatorTransport!,
       );
       final runId = const Uuid().v4();
       final email = 'creator-$runId@example.test';
@@ -133,6 +144,25 @@ void main() {
         await dilemmaGateway.revokeInvite(retry.dilemmaId);
         final afterRevoke = await dilemmaGateway.fetchDilemmas();
         expect(afterRevoke.single.isInviteRevoked, isTrue);
+        final voteAfterRevocation = await admin.rpc(
+          'submit_guest_vote',
+          params: {
+            'p_dilemma_id': retry.dilemmaId,
+            'p_session_secret_plain': secret,
+            'p_prediction': 'buy',
+            'p_rate_limit_key_hash': rateKey,
+          },
+        );
+        expect(voteAfterRevocation, isEmpty);
+        final openAfterRevocation = await admin.rpc(
+          'open_guest_invite_session',
+          params: {
+            'p_invite_token_plain': retry.inviteToken,
+            'p_session_secret_plain': secret,
+            'p_rate_limit_key_hash': rateKey,
+          },
+        );
+        expect(openAfterRevocation, isEmpty);
 
         // Hard delete dilemma (LGPD)
         await dilemmaGateway.deleteDilemma(retry.dilemmaId);

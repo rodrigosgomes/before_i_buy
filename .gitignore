@@ -21,3 +21,7 @@ apps/guest-web/tsconfig.tsbuildinfo
 
 # Local agent telemetry
 .github/context-mode/sessions/
+
+# Root-level local tool state
+.npm/
+.supabase/
