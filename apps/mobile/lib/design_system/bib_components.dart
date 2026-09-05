@@ -525,11 +525,9 @@ class BibConsentChecklist extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     container: true,
     label: 'Aceites internos de demonstração',
-    child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: BibColors.surfaceSubtle,
-        borderRadius: BorderRadius.circular(BibRadii.card),
-      ),
+    child: Material(
+      color: BibColors.surfaceSubtle,
+      borderRadius: BorderRadius.circular(BibRadii.card),
       child: Padding(
         padding: const EdgeInsets.all(BibSpacing.x3),
         child: Column(

@@ -70,11 +70,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: BibSpacing.x4),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(BibRadii.card),
-          ),
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(BibRadii.card),
           child: CheckboxListTile(
             value: _adultConfirmed,
             onChanged: (value) =>
