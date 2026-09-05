@@ -1,6 +1,6 @@
 # Task 4 — gestão privada de dilemas do criador
 
-**Status:** em fechamento local; implementação inicial no commit `d033215`
+**Status:** concluída no commit `9666bc0`; CI verde
 **Tipo:** vertical slice mobile, RPCs protegidas, persistência local e privacidade
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)
 **Depende de:** [Task 3B — perfil remoto, publicação e compartilhamento](T3B-remote-profile-publish-share.md)
@@ -111,4 +111,20 @@ depois de revogar ou apagar.
 
 ## Evidências de fechamento
 
-A preencher após correções, revisão independente e repetição dos gates locais.
+- Flutter: formatação e análise sem apontamentos; suíte completa com 89 testes
+  aprovados e 1 teste de sistema separado; cobertura de linhas em 95,58% (mínimo
+  de 80%).
+- Integração mobile/Supabase local: fluxo autenticado de listar, revogar,
+  bloquear sessão antiga e nova abertura, apagar e confirmar ausência aprovado.
+- Banco: 5 arquivos pgTAP e 164 testes aprovados; concorrência com 4 cenários
+  aprovada; nenhuma migration pendente.
+- Edge e web: contratos e runtime aprovados; lint web aprovado; 9 testes web
+  aprovados com 94,3% de linhas e 80,9% de branches; E2E crítico com 2 cenários
+  aprovado.
+- Revisão adversarial de produto, segurança/privacidade e QA concluída sem
+  achados P0 ou P1 após as correções.
+- CI remota do commit `9666bc0`: contrato do repositório, banco, mobile, web e
+  E2E crítico concluídos com sucesso no GitHub Actions.
+
+Analytics e a transição agendada de `collecting_votes` para `decision_due`
+continuam como trabalho da Entrega 1, fora da Task 4.
