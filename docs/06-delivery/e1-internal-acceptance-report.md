@@ -1,7 +1,7 @@
 # Relatório de aceite — Entrega 1 interna
 
-**Versão avaliada:** branch `task/e1-internal-closure`  
-**Estado:** aceite em andamento; deploy, CI da branch e sessão humana 3+3 pendentes  
+**Versão avaliada:** branch `task/e1-internal-closure`
+**Estado:** aceite em andamento; deploy, CI da branch e sessão humana 3+3 pendentes
 **Ambiente:** desenvolvimento local e staging HTTPS controlado
 
 Este relatório comprova a entrega técnica interna. Ele não autoriza beta

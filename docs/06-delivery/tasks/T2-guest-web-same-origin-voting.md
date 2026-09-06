@@ -1,6 +1,6 @@
 # Task 2 — web de convidado e proxy same-origin
 
-**Status:** concluída; deploy do staging interno controlado pela Task 6  
+**Status:** concluída; deploy do staging interno controlado pela Task 6
 **Tipo:** vertical slice web, segurança e qualidade  
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)  
 **Depende de:** [Task 1 — voto de convidado e agregados pós-voto](T1-guest-vote-submission-and-aggregates.md)
