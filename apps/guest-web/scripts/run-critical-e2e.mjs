@@ -48,7 +48,7 @@ function waitForServer(process) {
 }
 
 await new Promise((resolve) => upstream.listen(4111, "127.0.0.1", resolve));
-const next = spawn("./node_modules/.bin/next", ["dev", "--hostname", "localhost", "--port", "3100"], { env: { ...process.env, GUEST_INVITE_EDGE_ORIGIN: "http://127.0.0.1:4111" }, stdio: ["ignore", "pipe", "pipe"] });
+const next = spawn("./node_modules/.bin/next", ["dev", "--hostname", "localhost", "--port", "3100"], { env: { ...process.env, GUEST_INVITE_EDGE_ORIGIN: "http://127.0.0.1:4111", GUEST_WEB_BASE_PATH: "" }, stdio: ["ignore", "pipe", "pipe"] });
 try {
   await waitForServer(next);
   const playwright = spawn("./node_modules/.bin/playwright", ["test"], { stdio: "inherit" });

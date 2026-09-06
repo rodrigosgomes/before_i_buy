@@ -116,6 +116,14 @@ jobs:
       - run: npm run test:coverage
       - name: Enforce 80 percent line coverage
         run: bash ../../scripts/ci/assert-lcov-coverage.sh coverage/lcov.info 80
+      - name: Build Cloudflare staging artifact
+        run: npm run build:cloudflare
+      - name: Smoke Cloudflare staging path and privacy headers
+        run: XDG_CONFIG_HOME="$RUNNER_TEMP/wrangler" npm run test:cloudflare-build
+      - name: Validate Cloudflare worker bundles
+        run: |
+          XDG_CONFIG_HOME="$RUNNER_TEMP/wrangler" npx wrangler deploy --dry-run
+          XDG_CONFIG_HOME="$RUNNER_TEMP/wrangler" npx wrangler deploy --config wrangler.proxy.jsonc --dry-run
 
   guest-web-critical-e2e:
     name: Guest web critical E2E

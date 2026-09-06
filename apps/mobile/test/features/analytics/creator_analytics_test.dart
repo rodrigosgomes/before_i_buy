@@ -1,8 +1,9 @@
 import 'dart:convert';
 
-import 'package:before_i_buy/features/analytics/creator_analytics.dart';
+import 'package:before_i_buy_mobile/features/analytics/creator_analytics.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class _RecordingTransport implements CreatorAnalyticsTransport {
   final sent = <CreatorAnalyticsEntry>[];
@@ -28,7 +29,7 @@ CreatorAnalyticsEntry _entry({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
   test('serialized event contains only the closed client contract', () {
     final encoded = jsonEncode(_entry().toJson());
@@ -43,15 +44,8 @@ void main() {
   });
 
   test('queue is isolated by authenticated user', () async {
-    final preferences = SharedPreferences.getInstance();
-    final first = SharedPreferencesCreatorAnalyticsQueue(
-      userId: 'owner-a',
-      preferences: preferences,
-    );
-    final second = SharedPreferencesCreatorAnalyticsQueue(
-      userId: 'owner-b',
-      preferences: preferences,
-    );
+    final first = SecureCreatorAnalyticsQueue(userId: 'owner-a');
+    final second = SecureCreatorAnalyticsQueue(userId: 'owner-b');
 
     await first.save([_entry()]);
 
@@ -60,10 +54,7 @@ void main() {
   });
 
   test('offline failure preserves the event for a later retry', () async {
-    final queue = SharedPreferencesCreatorAnalyticsQueue(
-      userId: 'owner-a',
-      preferences: SharedPreferences.getInstance(),
-    );
+    final queue = SecureCreatorAnalyticsQueue(userId: 'owner-a');
     final transport = _RecordingTransport()..error = StateError('offline');
     final analytics = QueuedCreatorAnalytics(
       queue: queue,
@@ -81,10 +72,7 @@ void main() {
   });
 
   test('same event retry is deduplicated while queued', () async {
-    final queue = SharedPreferencesCreatorAnalyticsQueue(
-      userId: 'owner-a',
-      preferences: SharedPreferences.getInstance(),
-    );
+    final queue = SecureCreatorAnalyticsQueue(userId: 'owner-a');
     final transport = _RecordingTransport()..error = StateError('offline');
     final analytics = QueuedCreatorAnalytics(
       queue: queue,
@@ -98,15 +86,50 @@ void main() {
   });
 
   test('invalid persisted payload is discarded without throwing', () async {
-    SharedPreferences.setMockInitialValues({
-      '${SharedPreferencesCreatorAnalyticsQueue.storageKey}.owner-a':
+    FlutterSecureStorage.setMockInitialValues({
+      '${SecureCreatorAnalyticsQueue.storageKey}.${sha256.convert(utf8.encode('owner-a'))}':
           '[{"event":"not-allowed"}]',
     });
-    final queue = SharedPreferencesCreatorAnalyticsQueue(
-      userId: 'owner-a',
-      preferences: SharedPreferences.getInstance(),
-    );
+    final queue = SecureCreatorAnalyticsQueue(userId: 'owner-a');
 
     expect(await queue.load(), isEmpty);
   });
+
+  test(
+    'partial send survives restart without blocking later entries',
+    () async {
+      final queue = SecureCreatorAnalyticsQueue(userId: 'owner-a');
+      final firstTransport = _RecordingTransport();
+      final partial = _PartialFailureTransport();
+      final firstAnalytics = QueuedCreatorAnalytics(
+        queue: queue,
+        transport: partial,
+      );
+      await firstAnalytics.track(_entry());
+      await firstAnalytics.track(
+        _entry(eventId: '00000000-0000-4000-8000-000000000703'),
+      );
+
+      final restarted = QueuedCreatorAnalytics(
+        queue: SecureCreatorAnalyticsQueue(userId: 'owner-a'),
+        transport: firstTransport,
+      );
+      await restarted.flush();
+
+      expect(firstTransport.sent.map((entry) => entry.clientEventId), [
+        '00000000-0000-4000-8000-000000000703',
+      ]);
+      expect(await queue.load(), isEmpty);
+    },
+  );
+}
+
+class _PartialFailureTransport implements CreatorAnalyticsTransport {
+  var calls = 0;
+
+  @override
+  Future<void> send(CreatorAnalyticsEntry entry) async {
+    calls += 1;
+    if (calls > 1) throw StateError('offline');
+  }
 }

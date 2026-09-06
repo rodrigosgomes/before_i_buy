@@ -1,6 +1,6 @@
 begin;
 
-select plan(33);
+select plan(40);
 
 insert into auth.users (id) values
   ('00000000-0000-4000-8000-000000000601'),
@@ -34,6 +34,24 @@ select is(has_table_privilege('authenticated', 'private.e1_analytics_events', 's
   'authenticated cannot read analytics');
 select is(has_table_privilege('service_role', 'private.e1_analytics_events', 'select'), false,
   'service role cannot read analytics');
+select is(
+  (select count(*) from information_schema.role_table_grants
+    where table_schema = 'private' and table_name = 'e1_analytics_events'
+      and grantee = 'PUBLIC'), 0::bigint,
+  'PUBLIC has no event-store privilege'
+);
+select is(has_table_privilege('anon', 'private.e1_analytics_events', 'insert,update,delete'), false,
+  'anon cannot mutate analytics');
+select is(has_table_privilege('authenticated', 'private.e1_analytics_events', 'insert,update,delete'), false,
+  'authenticated cannot mutate analytics');
+select is(has_table_privilege('service_role', 'private.e1_analytics_events', 'insert,update,delete'), false,
+  'service role cannot mutate analytics');
+select is(
+  has_function_privilege('authenticated',
+    'private.record_e1_analytics_event(text,text,timestamptz,text,text,text,text,item_category,purchase_purpose,character varying,bigint,integer,vote_prediction)',
+    'execute'), false,
+  'authenticated cannot execute the internal recorder'
+);
 select is(
   has_function_privilege('authenticated',
     'public.record_creator_analytics_event(text,uuid,uuid,uuid,timestamptz)',
@@ -157,6 +175,21 @@ select is(
 
 set local role authenticated;
 select set_config(
+  'request.jwt.claim.sub', '00000000-0000-4000-8000-000000000602', true
+);
+select throws_ok(
+  $$ select public.record_creator_analytics_event(
+    'dilemma_share_invoked',
+    '61000000-0000-4000-8000-000000000604', null,
+    '63000000-0000-4000-8000-000000000601', clock_timestamp()
+  ) $$,
+  'P0002', 'Dilemma not found or unauthorized.',
+  'another creator cannot record share for an alien dilemma'
+);
+reset role;
+
+set local role authenticated;
+select set_config(
   'request.jwt.claim.sub', '00000000-0000-4000-8000-000000000601', true
 );
 select lives_ok(
@@ -271,6 +304,14 @@ select is(
   (select count(*) from private.e1_delivery_dashboard),
   1::bigint,
   'administrative delivery dashboard is queryable'
+);
+select ok(
+  (select vote_conversion_percent is not null
+      and liquidity_percent is not null
+      and creator_activation_7d_percent is not null
+      and revoked_or_deleted_within_10m = 1
+    from private.e1_delivery_dashboard),
+  'dashboard exposes conversion, liquidity, activation and early removal guardrail'
 );
 
 select * from finish();

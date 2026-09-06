@@ -516,12 +516,12 @@ class _AppFlowState extends State<AppFlow> {
 
   Future<String?> _shareFromDashboard() async {
     if (_activeInviteUri == null) return null;
-    _track(
-      CreatorAnalyticsEvent.dilemmaShareInvoked,
-      dilemmaId: _selectedDilemma?.id,
-    );
     try {
       await widget.shareGateway.share(_activeInviteUri!);
+      _track(
+        CreatorAnalyticsEvent.dilemmaShareInvoked,
+        dilemmaId: _selectedDilemma?.id,
+      );
       return null;
     } catch (_) {
       return 'Não foi possível abrir o compartilhamento agora.';
@@ -532,12 +532,12 @@ class _AppFlowState extends State<AppFlow> {
     if (!_isCurrent(_sessionGeneration) || _publishedInviteUri == null) {
       return null;
     }
-    _track(
-      CreatorAnalyticsEvent.dilemmaShareInvoked,
-      dilemmaId: _publishedDilemmaId,
-    );
     try {
       await widget.shareGateway.share(_publishedInviteUri!);
+      _track(
+        CreatorAnalyticsEvent.dilemmaShareInvoked,
+        dilemmaId: _publishedDilemmaId,
+      );
       return null;
     } catch (_) {
       return 'Não foi possível abrir o compartilhamento agora.';

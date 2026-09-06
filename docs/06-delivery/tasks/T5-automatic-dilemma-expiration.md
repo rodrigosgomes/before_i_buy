@@ -1,6 +1,6 @@
 # Task 5 — expiração automática dos dilemas
 
-**Status:** concluída no commit `6b0efc2`; CI verde
+**Status:** concluída no commit `6b0efc2`; CI verde e deploy remoto registrado
 **Tipo:** máquina de estados, rotina agendada e segurança temporal
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)
 **Depende de:** [Task 4 — gestão privada de dilemas](T4-creator-dilemma-management.md)
@@ -131,3 +131,7 @@ exclusão.
 - CI remota: [Quality gates 33984090714](https://github.com/rodrigosgomes/before_i_buy/actions/runs/33984090714)
   aprovada no commit `6b0efc2`, incluindo contrato do repositório, banco e cron,
   mobile, guest web e E2E crítico.
+- Deploy remoto no projeto de desenvolvimento `rfdutjlsskaptiukpshi` registrado
+  pelo commit documental `2d87c9d`: função instalada, exatamente um job ativo
+  `expire-due-dilemmas` em `* * * * *`, última execução bem-sucedida e nenhum
+  dilema vencido ainda em coleta na verificação pós-deploy.

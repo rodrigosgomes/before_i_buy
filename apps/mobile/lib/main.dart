@@ -38,7 +38,7 @@ Future<void> main() async {
     );
     dilemmaGateway = SupabaseCreatorDilemmaGateway(Supabase.instance.client);
     analyticsFactory = (userId) => QueuedCreatorAnalytics(
-      queue: SharedPreferencesCreatorAnalyticsQueue(userId: userId),
+      queue: SecureCreatorAnalyticsQueue(userId: userId),
       transport: SupabaseCreatorAnalyticsTransport(Supabase.instance.client),
     );
   }

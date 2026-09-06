@@ -1,6 +1,6 @@
 # Task 3 — mobile do criador: rascunho, revisão, publicação e compartilhamento
 
-**Status:** Task 3A concluída; Task 3B implementada e revisada, com validação local e pendências de fechamento registradas na task filha
+**Status:** concluída para uso interno; Tasks 3A e 3B revalidadas pela Task 6
 **Tipo:** vertical slice mobile, privacidade e integração  
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)  
 **Depende de:** [Task 2 — web de convidado](T2-guest-web-same-origin-voting.md)

@@ -76,6 +76,7 @@ test("opens a guest session through the private RPC and returns only the guest p
   const response = await handleGuestInvite(
     new Request("https://example.test/functions/v1/guest-invite", {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ inviteToken: validInviteToken }),
     }),
     {
@@ -127,6 +128,7 @@ test("returns the same generic response for malformed, invalid, and failed invit
   const malformed = await handleGuestInvite(
     new Request("https://example.test/functions/v1/guest-invite", {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: "not-json",
     }),
     { openGuestInviteSession: async () => validProjection, deriveRateLimitKey, now },
@@ -134,6 +136,7 @@ test("returns the same generic response for malformed, invalid, and failed invit
   const invalid = await handleGuestInvite(
     new Request("https://example.test/functions/v1/guest-invite", {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ inviteToken: invalidInviteToken }),
     }),
     { openGuestInviteSession: async () => null, deriveRateLimitKey, now },
@@ -141,6 +144,7 @@ test("returns the same generic response for malformed, invalid, and failed invit
   const failed = await handleGuestInvite(
     new Request("https://example.test/functions/v1/guest-invite", {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ inviteToken: failedInviteToken }),
     }),
     {
@@ -175,6 +179,7 @@ test("returns a generic 429 without a cookie when invite opening is limited", as
   const response = await handleGuestInvite(
     new Request("https://example.test/functions/v1/guest-invite", {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ inviteToken: validInviteToken }),
     }),
     {
@@ -197,6 +202,7 @@ test("submits a scoped guest vote from the HttpOnly session cookie", async () =>
     new Request("https://example.test/functions/v1/guest-invite/vote", {
       method: "POST",
       headers: {
+        "content-type": "application/json",
         cookie: `unrelated=value; before_i_buy_guest_session=${"B".repeat(43)}; another=value`,
       },
       body: JSON.stringify({
@@ -244,6 +250,7 @@ test("accepts buy, wait, and skip through the HTTP contract", async () => {
       new Request("https://example.test/functions/v1/guest-invite/vote", {
         method: "POST",
         headers: {
+          "content-type": "application/json",
           cookie: `before_i_buy_guest_session=${"P".repeat(43)}`,
         },
         body: JSON.stringify({
@@ -278,10 +285,11 @@ test("returns one generic vote failure without calling the RPC for malformed inp
   const requests = [
     new Request("https://example.test/functions/v1/guest-invite/vote", {
       method: "GET",
-      headers: { cookie: `before_i_buy_guest_session=${"B".repeat(43)}` },
+      headers: { "content-type": "application/json", cookie: `before_i_buy_guest_session=${"B".repeat(43)}` },
     }),
     new Request("https://example.test/functions/v1/guest-invite/vote", {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
         dilemmaId: "10000000-0000-4000-8000-000000000001",
         prediction: "buy",
@@ -289,7 +297,7 @@ test("returns one generic vote failure without calling the RPC for malformed inp
     }),
     new Request("https://example.test/functions/v1/guest-invite/vote", {
       method: "POST",
-      headers: { cookie: "before_i_buy_guest_session=too-short" },
+      headers: { "content-type": "application/json", cookie: "before_i_buy_guest_session=too-short" },
       body: JSON.stringify({
         dilemmaId: "10000000-0000-4000-8000-000000000001",
         prediction: "buy",
@@ -297,17 +305,17 @@ test("returns one generic vote failure without calling the RPC for malformed inp
     }),
     new Request("https://example.test/functions/v1/guest-invite/vote", {
       method: "POST",
-      headers: { cookie: `before_i_buy_guest_session=${"B".repeat(43)}` },
+      headers: { "content-type": "application/json", cookie: `before_i_buy_guest_session=${"B".repeat(43)}` },
       body: "not-json",
     }),
     new Request("https://example.test/functions/v1/guest-invite/vote", {
       method: "POST",
-      headers: { cookie: `before_i_buy_guest_session=${"B".repeat(43)}` },
+      headers: { "content-type": "application/json", cookie: `before_i_buy_guest_session=${"B".repeat(43)}` },
       body: JSON.stringify({ dilemmaId: "not-a-uuid", prediction: "buy" }),
     }),
     new Request("https://example.test/functions/v1/guest-invite/vote", {
       method: "POST",
-      headers: { cookie: `before_i_buy_guest_session=${"B".repeat(43)}` },
+      headers: { "content-type": "application/json", cookie: `before_i_buy_guest_session=${"B".repeat(43)}` },
       body: JSON.stringify({
         dilemmaId: "10000000-0000-4000-8000-000000000001",
         prediction: "maybe",
@@ -332,7 +340,7 @@ test("returns the same generic response for denied, failed, or malformed vote pr
     "https://example.test/functions/v1/guest-invite/vote",
     {
       method: "POST",
-      headers: { cookie: `before_i_buy_guest_session=${"C".repeat(43)}` },
+      headers: { "content-type": "application/json", cookie: `before_i_buy_guest_session=${"C".repeat(43)}` },
       body: JSON.stringify({
         dilemmaId: "10000000-0000-4000-8000-000000000001",
         prediction: "skip",
@@ -368,7 +376,7 @@ test("returns a generic 429 when the guest session vote limit is reached", async
   const response = await handleGuestVote(
     new Request("https://example.test/functions/v1/guest-invite/vote", {
       method: "POST",
-      headers: { cookie: `before_i_buy_guest_session=${"C".repeat(43)}` },
+      headers: { "content-type": "application/json", cookie: `before_i_buy_guest_session=${"C".repeat(43)}` },
       body: JSON.stringify({
         dilemmaId: "10000000-0000-4000-8000-000000000001",
         prediction: "wait",
@@ -389,7 +397,7 @@ test("routes only the exact guest-invite paths", async () => {
   const routedVote = await handleGuestInviteRequest(
     new Request("https://example.test/functions/v1/guest-invite/vote/", {
       method: "POST",
-      headers: { cookie: `before_i_buy_guest_session=${"D".repeat(43)}` },
+      headers: { "content-type": "application/json", cookie: `before_i_buy_guest_session=${"D".repeat(43)}` },
       body: JSON.stringify({
         dilemmaId: "10000000-0000-4000-8000-000000000001",
         prediction: "buy",
@@ -405,6 +413,7 @@ test("routes only the exact guest-invite paths", async () => {
   const internalOpen = await handleGuestInviteRequest(
     new Request("http://guest-invite/guest-invite", {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ inviteToken: validInviteToken }),
     }),
     {
@@ -419,7 +428,7 @@ test("routes only the exact guest-invite paths", async () => {
   const internalVote = await handleGuestInviteRequest(
     new Request("http://guest-invite/guest-invite/vote", {
       method: "POST",
-      headers: { cookie: `before_i_buy_guest_session=${"E".repeat(43)}` },
+      headers: { "content-type": "application/json", cookie: `before_i_buy_guest_session=${"E".repeat(43)}` },
       body: JSON.stringify({
         dilemmaId: "10000000-0000-4000-8000-000000000001",
         prediction: "buy",
@@ -435,6 +444,7 @@ test("routes only the exact guest-invite paths", async () => {
   const unknown = await handleGuestInviteRequest(
     new Request("https://example.test/not-the-function/guest-invite", {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ inviteToken: validInviteToken }),
     }),
     { openGuestInviteSession: async () => validProjection },
@@ -488,4 +498,32 @@ test("accepts only the configured browser origin through the same-origin proxy",
 
   assert.equal(accepted.status, 200);
   assert.equal(accepted.headers.get("access-control-allow-origin"), null);
+});
+
+test("rejects non-JSON and oversized request bodies before calling RPCs", async () => {
+  let calls = 0;
+  const dependencies = {
+    openGuestInviteSession: async () => { calls += 1; return validProjection; },
+    deriveRateLimitKey,
+    now,
+  };
+  const wrongType = await handleGuestInvite(
+    new Request("https://example.test/functions/v1/guest-invite", {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: JSON.stringify({ inviteToken: validInviteToken }),
+    }),
+    dependencies,
+  );
+  const oversized = await handleGuestInvite(
+    new Request("https://example.test/functions/v1/guest-invite", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ inviteToken: validInviteToken, padding: "x".repeat(4096) }),
+    }),
+    dependencies,
+  );
+  assert.equal(wrongType.status, 404);
+  assert.equal(oversized.status, 404);
+  assert.equal(calls, 0);
 });

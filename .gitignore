@@ -14,6 +14,8 @@ backend/node_modules/
 # Guest web generated artifacts
 apps/guest-web/node_modules/
 apps/guest-web/.next/
+apps/guest-web/.open-next/
+apps/guest-web/.wrangler/
 apps/guest-web/coverage/
 apps/guest-web/test-results/
 apps/guest-web/playwright-report/

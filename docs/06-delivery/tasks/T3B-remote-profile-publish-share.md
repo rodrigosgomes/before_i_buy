@@ -1,6 +1,6 @@
 # Task 3B — perfil remoto, publicação explícita e compartilhamento privado
 
-**Status:** validação local e manual concluídas; pronta para CI/merge
+**Status:** concluída para uso interno; revalidada pela Task 6
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)
 **Decisão:** [DEC-015](../DECISION_LOG.md#dec-015-consentimento-interno-versionado-para-publicação-no-desenvolvimento)
 **Depende de:** Task 3A concluída; contrato de publicação e voto já versionado

@@ -80,6 +80,16 @@ create index e1_analytics_events_dilemma_idx
   on private.e1_analytics_events (dilemma_key, occurred_at)
   where dilemma_key is not null;
 
+create table private.e1_analytics_rate_limits (
+  subject_key varchar(64) not null,
+  window_started_at timestamptz not null,
+  event_count integer not null check (event_count between 1 and 120),
+  primary key (subject_key, window_started_at)
+);
+alter table private.e1_analytics_rate_limits enable row level security;
+revoke all on table private.e1_analytics_rate_limits
+from public, anon, authenticated, service_role;
+
 create or replace function private.e1_analytics_pseudonym(p_value text)
 returns varchar(64)
 language plpgsql
@@ -198,6 +208,7 @@ as $$
 declare
   v_owner_id uuid := auth.uid();
   v_dilemma public.dilemmas%rowtype;
+  v_rate_count integer;
 begin
   if v_owner_id is null then
     raise exception 'Authentication required.' using errcode = '42501';
@@ -210,6 +221,20 @@ begin
     p_occurred_at > clock_timestamp() + interval '5 minutes'
   ) then
     raise exception 'Event timestamp is outside the accepted window.';
+  end if;
+
+  insert into private.e1_analytics_rate_limits (
+    subject_key, window_started_at, event_count
+  ) values (
+    private.e1_analytics_pseudonym('subject:' || v_owner_id::text),
+    date_trunc('hour', clock_timestamp()), 1
+  )
+  on conflict (subject_key, window_started_at) do update
+    set event_count = private.e1_analytics_rate_limits.event_count + 1
+    where private.e1_analytics_rate_limits.event_count < 120
+  returning event_count into v_rate_count;
+  if v_rate_count is null then
+    raise exception 'Analytics rate limit exceeded.' using errcode = 'P0001';
   end if;
 
   if p_event_name = 'dilemma_share_invoked' then
@@ -419,7 +444,31 @@ select
   (select count(*) from private.e1_analytics_events
     where event_name = 'vote_submitted')::bigint as submitted_votes,
   (select count(*) from per_dilemma where votes_in_24h >= 2)::bigint
-    as dilemmas_with_two_votes_in_24h;
+    as dilemmas_with_two_votes_in_24h,
+  round(100.0 * (select count(*) from private.e1_analytics_events
+    where event_name = 'vote_submitted') /
+    nullif((select count(*) from private.e1_analytics_events
+      where event_name = 'invite_opened'), 0), 2) as vote_conversion_percent,
+  round(100.0 * (select count(*) from per_dilemma where votes_in_24h >= 2) /
+    nullif((select count(*) from per_dilemma where published_at is not null), 0), 2)
+    as liquidity_percent,
+  round(100.0 * (
+    select count(distinct published.subject_key)
+      from private.e1_analytics_events published
+      join auth.users creator
+        on published.subject_key = private.e1_analytics_pseudonym(
+          'subject:' || creator.id::text
+        )
+     where published.event_name = 'dilemma_published'
+       and published.occurred_at <= creator.created_at + interval '7 days'
+  ) / nullif((select count(*) from auth.users), 0), 2)
+    as creator_activation_7d_percent,
+  (select count(distinct changed.dilemma_key) from private.e1_analytics_events changed
+    join private.e1_analytics_events published using (dilemma_key)
+   where changed.event_name in ('invite_link_revoked', 'dilemma_deleted')
+     and published.event_name = 'dilemma_published'
+     and changed.occurred_at <= published.occurred_at + interval '10 minutes')::bigint
+    as revoked_or_deleted_within_10m;
 
 revoke all on private.e1_event_funnel_daily,
   private.e1_usability_daily, private.e1_delivery_dashboard
@@ -436,6 +485,8 @@ begin
   delete from private.e1_analytics_events
    where recorded_at < clock_timestamp() - interval '13 months';
   get diagnostics v_count = row_count;
+  delete from private.e1_analytics_rate_limits
+   where window_started_at < clock_timestamp() - interval '2 hours';
   return v_count;
 end;
 $$;

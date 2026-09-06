@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum CreatorAnalyticsEvent {
@@ -76,45 +77,55 @@ abstract interface class CreatorAnalytics {
 
 typedef CreatorAnalyticsFactory = CreatorAnalytics Function(String userId);
 
-class SharedPreferencesCreatorAnalyticsQueue implements CreatorAnalyticsQueue {
-  SharedPreferencesCreatorAnalyticsQueue({
+class SecureCreatorAnalyticsQueue implements CreatorAnalyticsQueue {
+  SecureCreatorAnalyticsQueue({
     required this.userId,
-    Future<SharedPreferences>? preferences,
-  }) : _preferences = preferences ?? SharedPreferences.getInstance();
+    FlutterSecureStorage? storage,
+    DateTime Function()? now,
+  }) : _storage = storage ?? const FlutterSecureStorage(),
+       _now = now ?? DateTime.now;
 
   static const storageKey = 'bib.creator_analytics.v1';
+  static const retention = Duration(days: 7);
+  static const maxEntries = 200;
   final String userId;
-  final Future<SharedPreferences> _preferences;
-  String get _scopedKey => '$storageKey.$userId';
+  final FlutterSecureStorage _storage;
+  final DateTime Function() _now;
+  String get _scopedKey => '$storageKey.${sha256.convert(utf8.encode(userId))}';
 
   @override
   Future<List<CreatorAnalyticsEntry>> load() async {
-    final raw = (await _preferences).getString(_scopedKey);
+    final raw = await _storage.read(key: _scopedKey);
     if (raw == null) return const [];
     try {
       final values = jsonDecode(raw);
       if (values is! List) return const [];
-      return values.map(CreatorAnalyticsEntry.fromJson).toList(growable: false);
+      final cutoff = _now().toUtc().subtract(retention);
+      final entries = values
+          .map(CreatorAnalyticsEntry.fromJson)
+          .where((entry) => entry.occurredAt.toUtc().isAfter(cutoff))
+          .take(maxEntries)
+          .toList(growable: false);
+      if (entries.length != values.length) await save(entries);
+      return entries;
     } on FormatException {
+      await _storage.delete(key: _scopedKey);
       return const [];
     }
   }
 
   @override
   Future<void> save(List<CreatorAnalyticsEntry> entries) async {
-    final preferences = await _preferences;
     if (entries.isEmpty) {
-      final removed = await preferences.remove(_scopedKey);
-      if (!removed && preferences.containsKey(_scopedKey)) {
-        throw StateError('Analytics queue was not cleared.');
-      }
+      await _storage.delete(key: _scopedKey);
       return;
     }
-    final saved = await preferences.setString(
-      _scopedKey,
-      jsonEncode(entries.map((entry) => entry.toJson()).toList()),
+    await _storage.write(
+      key: _scopedKey,
+      value: jsonEncode(
+        entries.take(maxEntries).map((entry) => entry.toJson()).toList(),
+      ),
     );
-    if (!saved) throw StateError('Analytics queue was not saved.');
   }
 }
 
