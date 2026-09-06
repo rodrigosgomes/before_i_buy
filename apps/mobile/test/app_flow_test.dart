@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:before_i_buy_mobile/app.dart';
 import 'package:before_i_buy_mobile/core/app_config.dart';
 import 'package:before_i_buy_mobile/features/auth/auth_gateway.dart';
+import 'package:before_i_buy_mobile/features/analytics/creator_analytics.dart';
 import 'package:before_i_buy_mobile/features/creator/active_invite_repository.dart';
 import 'package:before_i_buy_mobile/features/creator/draft.dart';
 import 'package:before_i_buy_mobile/features/creator/draft_repository.dart';
@@ -39,6 +40,7 @@ BeforeIBuyApp testApp({
   CreatorDilemmaGateway? dilemmaGateway,
   InviteShareGateway? share,
   Future<void> Function()? purgeLegacyInvites,
+  CreatorAnalyticsFactory? analyticsFactory,
 }) => BeforeIBuyApp(
   config: config,
   authGateway: auth,
@@ -52,6 +54,7 @@ BeforeIBuyApp testApp({
   createId: () => uuid,
   platform: platform,
   purgeLegacyInvites: purgeLegacyInvites,
+  analyticsFactory: analyticsFactory,
 );
 
 Future<void> tapVisible(WidgetTester tester, Finder finder) async {
@@ -154,6 +157,7 @@ void main() {
     );
     final publication = MemoryDilemmaPublicationGateway();
     final share = MemoryInviteShareGateway();
+    final analytics = MemoryCreatorAnalytics();
     await tester.pumpWidget(
       testApp(
         auth: auth,
@@ -162,6 +166,7 @@ void main() {
         profile: profile,
         publication: publication,
         share: share,
+        analyticsFactory: (_) => analytics,
       ),
     );
     await tester.pumpAndSettle();
@@ -227,6 +232,15 @@ void main() {
     expect(share.shared, hasLength(1));
     expect(share.shared.single.host, 'guest.example.com');
     expect(share.shared.single.pathSegments.take(1), ['invite']);
+    expect(
+      analytics.entries.map((entry) => entry.event),
+      containsAll([
+        CreatorAnalyticsEvent.dilemmaCreateStarted,
+        CreatorAnalyticsEvent.dilemmaDraftSaved,
+        CreatorAnalyticsEvent.offlineDraftPublishReviewed,
+        CreatorAnalyticsEvent.dilemmaShareInvoked,
+      ]),
+    );
 
     await tapVisible(tester, find.text('Ver painel de acompanhamento'));
     expect(find.text('Painel do dilema'), findsOneWidget);

@@ -1,6 +1,6 @@
 # Task 3A — entrada, onboarding e rascunho local
 
-**Status:** em implementação interna
+**Status:** concluída para uso interno; revalidada pela Task 6
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)
 **Decisão:** [DEC-014](../DECISION_LOG.md#dec-014-autenticação-nativa-do-criador-por-google)
 

@@ -133,6 +133,42 @@ function isValidVoteProjection(projection) {
     projection.total_votes;
 }
 
+const maximumBodyBytes = 2048;
+
+export async function readLimitedJson(request) {
+  const contentType = request.headers.get("content-type");
+  if (contentType && !contentType.toLowerCase().startsWith("application/json")) {
+    return null;
+  }
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maximumBodyBytes) return null;
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maximumBodyBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value.slice());
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(body));
+  } catch {
+    return null;
+  }
+}
+
 export async function handleGuestInvite(
   request,
   {
@@ -151,12 +187,7 @@ export async function handleGuestInvite(
     return unavailableInviteResponse(404, request, allowedOrigin);
   }
 
-  let payload;
-  try {
-    payload = await request.json();
-  } catch {
-    return unavailableInviteResponse(404, request, allowedOrigin);
-  }
+  const payload = await readLimitedJson(request);
 
   if (!isPlausibleInviteToken(payload?.inviteToken)) {
     return unavailableInviteResponse(404, request, allowedOrigin);
@@ -235,12 +266,7 @@ export async function handleGuestVote(
     return unavailableVoteResponse(404, request, allowedOrigin);
   }
 
-  let payload;
-  try {
-    payload = await request.json();
-  } catch {
-    return unavailableVoteResponse(404, request, allowedOrigin);
-  }
+  const payload = await readLimitedJson(request);
 
   if (!isUuid(payload?.dilemmaId) || !votePredictions.has(payload?.prediction)) {
     return unavailableVoteResponse(404, request, allowedOrigin);

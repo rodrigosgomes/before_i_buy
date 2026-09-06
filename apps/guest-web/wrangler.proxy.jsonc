@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "before-i-buy-e1-guest-api",
+  "main": "cloudflare-proxy/worker.ts",
+  "compatibility_date": "2026-09-05",
+  "routes": [
+    {
+      "pattern": "myelolabs.com.br/functions/v1/guest-invite",
+      "zone_name": "myelolabs.com.br"
+    },
+    {
+      "pattern": "myelolabs.com.br/functions/v1/guest-invite/vote",
+      "zone_name": "myelolabs.com.br"
+    }
+  ]
+}

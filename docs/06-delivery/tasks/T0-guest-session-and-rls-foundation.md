@@ -1,6 +1,6 @@
 # Task 0 — sessão de convidado e fundação RLS
 
-**Status:** concluída localmente; pronta para revisão de PR  
+**Status:** concluída; revalidada pelos gates integrais da Task 6
 **Tipo:** segurança, privacidade e banco  
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)  
 **Bloqueia:** qualquer tela, API ou E2E que leia convite ou grave voto de convidado.

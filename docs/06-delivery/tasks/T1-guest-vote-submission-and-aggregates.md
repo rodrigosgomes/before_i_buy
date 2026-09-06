@@ -1,7 +1,7 @@
 # Task 1 — voto de convidado e agregados pós-voto
 
-**Status:** implementação backend e integração browser local validadas; beta
-externo permanece sujeito ao gate operacional
+**Status:** concluída para uso interno; revalidada pela Task 6; beta externo
+permanece sujeito ao gate operacional
 **Tipo:** vertical slice de produto, segurança e banco  
 **Entrega relacionada:** [Entrega 1](../../01-product/first-delivery-mini-prd.md)  
 **Depende de:** [Task 0 — sessão de convidado e fundação RLS](T0-guest-session-and-rls-foundation.md)

@@ -3,7 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTypeScript from "eslint-config-next/typescript";
 
 const config = [
-  globalIgnores([".next/**", "coverage/**", "playwright-report/**", "next-env.d.ts"]),
+  globalIgnores([".next/**", ".open-next/**", "coverage/**", "playwright-report/**", "next-env.d.ts"]),
   ...nextVitals,
   ...nextTypeScript,
   {

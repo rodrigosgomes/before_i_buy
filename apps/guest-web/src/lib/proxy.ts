@@ -10,6 +10,37 @@ const protectedResponseHeaders = [
   "referrer-policy",
   "x-robots-tag",
 ];
+const maximumBodyBytes = 2048;
+
+async function readLimitedBody(request: Request) {
+  const contentType = request.headers.get("content-type");
+  if (contentType && !contentType.toLowerCase().startsWith("application/json")) {
+    return null;
+  }
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maximumBodyBytes) return null;
+  if (!request.body) return new Uint8Array();
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maximumBodyBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value.slice());
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
 
 function unavailableResponse(status = 404) {
   return new Response(JSON.stringify({ error: "invite_unavailable" }), {
@@ -50,6 +81,8 @@ export async function proxyGuestInvite(
   }
   const upstreamOrigin = readEdgeOrigin(edgeOrigin);
   if (!upstreamOrigin) return unavailableResponse();
+  const body = await readLimitedBody(request);
+  if (body == null) return unavailableResponse();
 
   const headers = new Headers();
   for (const name of forwardedHeaders) {
@@ -61,7 +94,7 @@ export async function proxyGuestInvite(
     const upstream = await fetcher(new URL(path, upstreamOrigin), {
       method: "POST",
       headers,
-      body: await request.arrayBuffer(),
+      body,
       redirect: "manual",
     });
     const responseHeaders = new Headers();

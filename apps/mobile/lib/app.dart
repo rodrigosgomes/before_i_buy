@@ -9,6 +9,7 @@ import 'design_system/bib_components.dart';
 import 'design_system/bib_theme.dart';
 import 'features/auth/auth_gateway.dart';
 import 'features/auth/google_sign_in_screen.dart';
+import 'features/analytics/creator_analytics.dart';
 import 'features/creator/creator_flow.dart';
 import 'features/creator/creator_remote_gateway.dart';
 import 'features/creator/draft.dart';
@@ -32,6 +33,7 @@ class BeforeIBuyApp extends StatelessWidget {
     String Function()? createId,
     TargetPlatform? platform,
     Future<void> Function()? purgeLegacyInvites,
+    CreatorAnalyticsFactory? analyticsFactory,
   }) : creatorProfileGateway =
            creatorProfileGateway ?? MemoryCreatorProfileGateway(),
        publicationGateway =
@@ -41,7 +43,9 @@ class BeforeIBuyApp extends StatelessWidget {
        createId = createId ?? const Uuid().v4,
        platform = platform ?? defaultTargetPlatform,
        purgeLegacyInvites =
-           purgeLegacyInvites ?? LegacyActiveInviteStorage.purgeAll;
+           purgeLegacyInvites ?? LegacyActiveInviteStorage.purgeAll,
+       analyticsFactory =
+           analyticsFactory ?? ((_) => const NoopCreatorAnalytics());
 
   final AppConfig config;
   final AuthGateway? authGateway;
@@ -55,6 +59,7 @@ class BeforeIBuyApp extends StatelessWidget {
   final String Function() createId;
   final TargetPlatform platform;
   final Future<void> Function() purgeLegacyInvites;
+  final CreatorAnalyticsFactory analyticsFactory;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -74,6 +79,7 @@ class BeforeIBuyApp extends StatelessWidget {
       createId: createId,
       platform: platform,
       purgeLegacyInvites: purgeLegacyInvites,
+      analyticsFactory: analyticsFactory,
     ),
   );
 }
@@ -108,6 +114,7 @@ class AppFlow extends StatefulWidget {
     required this.createId,
     required this.platform,
     required this.purgeLegacyInvites,
+    required this.analyticsFactory,
   });
 
   final AppConfig config;
@@ -122,6 +129,7 @@ class AppFlow extends StatefulWidget {
   final String Function() createId;
   final TargetPlatform platform;
   final Future<void> Function() purgeLegacyInvites;
+  final CreatorAnalyticsFactory analyticsFactory;
 
   @override
   State<AppFlow> createState() => _AppFlowState();
@@ -146,6 +154,7 @@ class _AppFlowState extends State<AppFlow> {
   Future<void> _draftWrites = Future.value();
   Object? _draftWriteError;
   bool _publishing = false;
+  CreatorAnalytics _analytics = const NoopCreatorAnalytics();
 
   OnboardingRepository get _onboardingRepository =>
       widget.onboardingRepository ??
@@ -182,6 +191,10 @@ class _AppFlowState extends State<AppFlow> {
     _publishing = false;
     _draftWriteError = null;
     _draftWrites = Future.value();
+    _analytics = userId == null
+        ? const NoopCreatorAnalytics()
+        : widget.analyticsFactory(userId);
+    if (userId != null) unawaited(_analytics.flush());
     if (userId == null) {
       if (mounted) setState(() => _stage = AppStage.googleSignIn);
     } else {
@@ -195,7 +208,13 @@ class _AppFlowState extends State<AppFlow> {
     _draftWrites = _draftWrites
         .then((_) => repository.save(draft))
         .then((_) {
-          if (_isCurrent(generation)) _draftWriteError = null;
+          if (_isCurrent(generation)) {
+            _draftWriteError = null;
+            _track(
+              CreatorAnalyticsEvent.dilemmaDraftSaved,
+              draftId: draft.idempotencyKey,
+            );
+          }
         })
         .catchError((Object error) {
           if (_isCurrent(generation)) _draftWriteError = error;
@@ -241,6 +260,11 @@ class _AppFlowState extends State<AppFlow> {
     final draft = await draftRepository.load();
     if (!_isCurrent(generation)) return;
     if (draft != null) {
+      _track(
+        CreatorAnalyticsEvent.offlineDraftRecovered,
+        clientEventId: draft.idempotencyKey,
+        draftId: draft.idempotencyKey,
+      );
       _showDraft(draft);
       return;
     }
@@ -324,6 +348,11 @@ class _AppFlowState extends State<AppFlow> {
     _draft = draft;
     _recoveredDraft = false;
     _saveDraft(draft);
+    _track(
+      CreatorAnalyticsEvent.dilemmaCreateStarted,
+      clientEventId: draft.idempotencyKey,
+      draftId: draft.idempotencyKey,
+    );
     setState(() => _stage = AppStage.draft);
   }
 
@@ -489,6 +518,10 @@ class _AppFlowState extends State<AppFlow> {
     if (_activeInviteUri == null) return null;
     try {
       await widget.shareGateway.share(_activeInviteUri!);
+      _track(
+        CreatorAnalyticsEvent.dilemmaShareInvoked,
+        dilemmaId: _selectedDilemma?.id,
+      );
       return null;
     } catch (_) {
       return 'Não foi possível abrir o compartilhamento agora.';
@@ -501,6 +534,10 @@ class _AppFlowState extends State<AppFlow> {
     }
     try {
       await widget.shareGateway.share(_publishedInviteUri!);
+      _track(
+        CreatorAnalyticsEvent.dilemmaShareInvoked,
+        dilemmaId: _publishedDilemmaId,
+      );
       return null;
     } catch (_) {
       return 'Não foi possível abrir o compartilhamento agora.';
@@ -515,6 +552,25 @@ class _AppFlowState extends State<AppFlow> {
         setState(() => _stage = AppStage.googleSignIn);
       }
     }
+  }
+
+  void _track(
+    CreatorAnalyticsEvent event, {
+    String? clientEventId,
+    String? draftId,
+    String? dilemmaId,
+  }) {
+    unawaited(
+      _analytics.track(
+        CreatorAnalyticsEntry(
+          event: event,
+          clientEventId: clientEventId ?? widget.createId(),
+          occurredAt: DateTime.now().toUtc(),
+          draftId: draftId,
+          dilemmaId: dilemmaId,
+        ),
+      ),
+    );
   }
 
   @override
@@ -562,7 +618,14 @@ class _AppFlowState extends State<AppFlow> {
       draft: _draft!,
       recovered: _recoveredDraft,
       onEdit: () => setState(() => _stage = AppStage.draft),
-      onPreview: () => setState(() => _stage = AppStage.preview),
+      onPreview: () {
+        _track(
+          CreatorAnalyticsEvent.offlineDraftPublishReviewed,
+          clientEventId: _draft!.idempotencyKey,
+          draftId: _draft!.idempotencyKey,
+        );
+        setState(() => _stage = AppStage.preview);
+      },
     ),
     AppStage.preview => GuestPreviewScreen(
       draft: _draft!,

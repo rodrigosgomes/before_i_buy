@@ -23,3 +23,30 @@ test("revoked or unavailable invite remains generic", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Este convite não está disponível" })).toBeVisible();
   await expect(page.getByText("Fone com cancelamento")).toHaveCount(0);
 });
+
+test("critical vote remains keyboard-accessible at 320px and 200% text", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto(`/invite/${token}`);
+  await page.locator("html").evaluate((element) => {
+    element.style.fontSize = "200%";
+  });
+  for (let step = 0; step < 10; step += 1) {
+    await page.keyboard.press("Tab");
+    if (await page.locator('main input[type="radio"]:focus').count()) break;
+  }
+  const focused = page.locator('main input[type="radio"]:focus');
+  await expect(focused).toHaveCount(1);
+  await page.keyboard.press("Space");
+  const submit = page.getByRole("button", { name: "Enviar meu palpite" });
+  for (let step = 0; step < 5; step += 1) {
+    await page.keyboard.press("Tab");
+    if (await submit.evaluate((element) => element === document.activeElement)) break;
+  }
+  await expect(submit).toBeFocused();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(false);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Seu palpite entrou" })).toBeVisible();
+});

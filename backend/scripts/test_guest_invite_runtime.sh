@@ -11,9 +11,9 @@ vote_headers="$runtime_dir/vote-headers.txt"
 vote_body="$runtime_dir/vote-body.txt"
 revoked_vote_headers="$runtime_dir/revoked-vote-headers.txt"
 revoked_vote_body="$runtime_dir/revoked-vote-body.txt"
-runtime_owner_id="00000000-0000-4000-8000-000000000901"
-runtime_dilemma_id="10000000-0000-4000-8000-000000000901"
-runtime_invite_token="RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+runtime_owner_id="$(node -e "process.stdout.write(crypto.randomUUID())")"
+runtime_dilemma_id="$(node -e "process.stdout.write(crypto.randomUUID())")"
+runtime_invite_token="$(node -e "process.stdout.write(crypto.randomBytes(32).toString('base64url'))")"
 runtime_rate_limit_secret="local-runtime-rate-limit-secret-32-bytes-minimum"
 db_container="supabase_db_before-i-buy"
 
@@ -65,6 +65,8 @@ SQL
 }
 trap report_failure ERR
 
+dilemma_seeded=1
+
 run_psql <<SQL
 select pg_notify('pgrst', 'reload schema');
 insert into auth.users (id) values ('$runtime_owner_id');
@@ -82,7 +84,6 @@ insert into public.dilemmas (
   encode(extensions.digest('$runtime_invite_token', 'sha256'), 'hex'), false
 );
 SQL
-dilemma_seeded=1
 
 printf 'GUEST_RATE_LIMIT_SECRET=%s\n' \
   "$runtime_rate_limit_secret" >"$runtime_env_file"

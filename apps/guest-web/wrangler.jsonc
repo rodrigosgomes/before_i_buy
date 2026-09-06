@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "before-i-buy-e1-guest-web",
+  "main": "cloudflare-web/worker.mjs",
+  "compatibility_date": "2026-09-05",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "routes": [
+    {
+      "pattern": "myelolabs.com.br/eloease/guest-invite*",
+      "zone_name": "myelolabs.com.br"
+    }
+  ]
+}

@@ -25,4 +25,21 @@ describe("same-origin guest proxy", () => {
     expect((await proxyGuestInvite(post, "/functions/v1/guest-invite", { edgeOrigin: "https://edge.example/path" })).status).toBe(404);
     expect((await proxyGuestInvite(post, "/functions/v1/guest-invite", { edgeOrigin: "https://edge.example", fetcher: async () => { throw new Error("offline"); } })).status).toBe(404);
   });
+
+  it("rejects non-JSON and oversized bodies before contacting the upstream", async () => {
+    const fetcher = vi.fn();
+    const wrongType = new Request("https://guest.example/functions/v1/guest-invite", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: "{}",
+    });
+    const oversized = new Request("https://guest.example/functions/v1/guest-invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ padding: "x".repeat(4096) }),
+    });
+    expect((await proxyGuestInvite(wrongType, "/functions/v1/guest-invite", { edgeOrigin: "https://edge.example", fetcher })).status).toBe(404);
+    expect((await proxyGuestInvite(oversized, "/functions/v1/guest-invite", { edgeOrigin: "https://edge.example", fetcher })).status).toBe(404);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
